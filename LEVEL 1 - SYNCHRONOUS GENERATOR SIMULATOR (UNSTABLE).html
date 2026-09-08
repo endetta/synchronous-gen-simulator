@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Synchronous Generator Operation — Sheva's Simulator Library</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Chart.js for Time Series -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1077,119 +1083,106 @@ function updateSvgPdelta(){
 }
 
 // ================================================================
-// CANVAS TIME SERIES  — FIXED: uses parentElement for dimensions
+// CHART.JS TIME SERIES  — Interactive charts with zoom/pan
 // ================================================================
-const cv3=document.getElementById('cv3');
-const cx3=cv3.getContext('2d');
-function ff(sz){return `${sz}px 'EB Garamond',Georgia,serif`}
-function fh(sz){return `${sz}px 'Playfair Display',Georgia,serif`}
-function fm(sz){return `${sz}px 'Courier New',monospace`}
+const timeCharts={};
 
-function drawTime(){
-  const pane=cv3.parentElement;
-  const w=Math.max(10,pane.clientWidth), h=Math.max(10,pane.clientHeight);
-  const dpr=window.devicePixelRatio||1;
-  const pw2=Math.round(w*dpr),ph2=Math.round(h*dpr);
-  if(cv3.width!==pw2||cv3.height!==ph2){
-    cv3.width=pw2; cv3.height=ph2;
-    cv3.style.width=w+'px'; cv3.style.height=h+'px';
+function initTimeCharts(){
+  const pane=document.getElementById('pane3');
+  if(!pane)return;
+
+  // Clear existing content
+  pane.innerHTML='';
+
+  // Create container for 4 stacked charts with flexbox
+  const container=document.createElement('div');
+  container.style.cssText='display:flex;flex-direction:column;gap:2px;height:100%;padding:6px;background:#f4f6fb;';
+
+  // Create chart wrappers with aspect ratio control
+  for(let i=0;i<4;i++){
+    const wrapper=document.createElement('div');
+    wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:60px;';
+    wrapper.innerHTML=`<canvas style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>`;
+    container.appendChild(wrapper);
   }
-  const ctx=cx3;
-  ctx.resetTransform(); ctx.scale(dpr,dpr);
-  ctx.fillStyle='#f4f6fb'; ctx.fillRect(0,0,w,h);
-  if(S.hist.length<2)return;
 
-  const ml=52,mr=12,mt=22,mb=18;
-  const GAP=3,NP=4;
-  const ph_tot=h-mt-mb-GAP*(NP-1),ph=ph_tot/NP,pw=w-ml-mr;
-  const te=S.hist[S.hist.length-1].t,ts=Math.max(0,te-HWIN);
-  const tx=t=>ml+((t-ts)/(te-ts||1))*pw;
+  pane.appendChild(container);
 
-  const plots=[
-    {keys:['ddeg'],    label:'δ  (°)',    cols:['#806000'],dp:2},
-    {keys:['omega'],   label:'Δω  (pu)',  cols:['#3a6818'],dp:5},
-    {keys:['Pe','Pm'], label:'Pe & Pm (pu)',cols:['#006898','#b85800'],dp:3},
-    {keys:['f'],       label:'f  (Hz)',   cols:['#0a7040'],dp:3},
-  ];
+  // Initialize Chart.js instances
+  const canvases=container.querySelectorAll('canvas');
+  const baseOpts={
+    responsive:true,
+    maintainAspectRatio:false,
+    animation:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false,position:'top'},tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}},
+    scales:{x:{display:true,grid:{display:true,color:'#e8ecf4'},ticks:{color:'#3a4465',font:{size:10},maxTicksLimit:5},border:{color:'#ccd2e0'}},y:{display:true,grid:{color:'#e8ecf4'},ticks:{color:'#3a4465',font:{size:10}},border:{color:'#ccd2e0'}}},
+    elements:{point:{radius:0,hoverRadius:3},line:{tension:0.3,borderWidth:2}}
+  };
 
-  plots.forEach((pl,pi)=>{
-    const py=mt+pi*(ph+GAP);
-    let vals=S.hist.flatMap(d=>pl.keys.map(k=>d[k]));
-    let yMin=Math.min(...vals),yMax=Math.max(...vals);
-    const span=yMax-yMin||0.001;
-    yMin-=span*0.06; yMax+=span*0.06;
-    if(pl.keys[0]==='f'){yMin=Math.min(yMin,F0-.05);yMax=Math.max(yMax,F0+.05);}
-    if(pl.keys[0]==='omega'){yMin=Math.min(yMin,-.003);yMax=Math.max(yMax,.003);}
-    if(pl.keys[0]==='ddeg')yMin=Math.min(yMin,0);
-    const fy=v=>py+ph-((v-yMin)/(yMax-yMin))*ph;
-
-    ctx.fillStyle='#ffffff'; ctx.fillRect(ml,py,pw,ph);
-
-    // Grid
-    ctx.strokeStyle='#e8ecf4'; ctx.lineWidth=0.8;
-    for(let gi=0;gi<=4;gi++){
-      const v=yMin+(gi/4)*(yMax-yMin),gy=fy(v);
-      if(gy>py&&gy<py+ph){ctx.beginPath();ctx.moveTo(ml,gy);ctx.lineTo(ml+pw,gy);ctx.stroke();}
-    }
-    // Reference lines
-    if(yMin<0&&yMax>0){ctx.strokeStyle='#ccd2e0';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(ml,fy(0));ctx.lineTo(ml+pw,fy(0));ctx.stroke();ctx.setLineDash([]);}
-    if(pl.keys[0]==='f'){ctx.strokeStyle='#ccd2e0';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(ml,fy(F0));ctx.lineTo(ml+pw,fy(F0));ctx.stroke();ctx.setLineDash([]);}
-
-    // SC bands
-    let sc_s=null;
-    S.hist.forEach(d=>{
-      if(d.t<ts)return;
-      const x=tx(d.t);
-      if(d.sc&&sc_s===null)sc_s=x;
-      if(!d.sc&&sc_s!==null){
-        ctx.fillStyle='rgba(196,32,0,.07)';ctx.fillRect(sc_s,py,x-sc_s,ph);
-        ctx.strokeStyle='rgba(196,32,0,.38)';ctx.lineWidth=1;
-        ctx.beginPath();ctx.moveTo(Math.round(sc_s)+.5,py);ctx.lineTo(Math.round(sc_s)+.5,py+ph);ctx.stroke();
-        sc_s=null;
-      }
-    });
-    if(sc_s!==null){ctx.fillStyle='rgba(196,32,0,.07)';ctx.fillRect(sc_s,py,ml+pw-sc_s,ph);}
-
-    // Traces
-    pl.keys.forEach((k,ki)=>{
-      ctx.strokeStyle=pl.cols[ki];ctx.lineWidth=1.8;ctx.lineJoin='round';ctx.lineCap='round';
-      ctx.beginPath();let first=true;
-      S.hist.forEach(d=>{
-        if(d.t<ts)return;
-        const x=tx(d.t),v=d[k],y=Math.max(py-1,Math.min(py+ph+1,fy(v)));
-        first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
-      });
-      ctx.stroke();
-    });
-
-    // Y labels
-    for(let gi=0;gi<=2;gi++){
-      const v=yMin+(gi/2)*(yMax-yMin),gy=fy(v);
-      if(gy>py+4&&gy<py+ph-4){
-        ctx.fillStyle='#3a4465';ctx.font=fm(9.5);ctx.textAlign='right';ctx.textBaseline='middle';
-        ctx.fillText(v.toFixed(pl.dp||2),ml-3,gy);
-      }
-    }
-    // Left accent bar
-    ctx.fillStyle=pl.cols[0];ctx.fillRect(ml,py,3,ph);
-    // Label
-    ctx.fillStyle=pl.cols[0];ctx.font=fh(11);ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillText(pl.label,ml+6,py+3);
-    // Current value
-    const last=S.hist[S.hist.length-1];
-    let cv_t=pl.keys.length>1?`Pe=${last[pl.keys[0]].toFixed(3)} Pm=${last[pl.keys[1]].toFixed(3)}`:last[pl.keys[0]].toFixed(pl.dp||2);
-    ctx.fillStyle=pl.cols[0];ctx.font=fm(9.5);ctx.textAlign='right';ctx.textBaseline='top';
-    ctx.fillText(cv_t,ml+pw-3,py+3);
-    // Border
-    ctx.strokeStyle='#ccd2e0';ctx.lineWidth=1;ctx.strokeRect(ml,py,pw,ph);
+  timeCharts.delta=new Chart(canvases[0],{
+    type:'line',
+    data:{labels:[],datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'δ (degrees)',color:'#806000',font:{weight:'bold'}}}}}
   });
 
-  // X axis
-  ctx.fillStyle='#3a4465';ctx.font=fm(9.5);ctx.textAlign='center';ctx.textBaseline='bottom';
-  for(let i=0;i<=5;i++){
-    const t=ts+(i/5)*(te-ts);
-    ctx.fillText(t.toFixed(1)+'s',tx(t),h-2);
-  }
+  timeCharts.omega=new Chart(canvases[1],{
+    type:'line',
+    data:{labels:[],datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold'}}}}}
+  });
+
+  timeCharts.power=new Chart(canvases[2],{
+    type:'line',
+    data:{labels:[],datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold'}}}}}
+  });
+
+  timeCharts.freq=new Chart(canvases[3],{
+    type:'line',
+    data:{labels:[],datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold'}}}}}
+  });
+}
+
+function updateTimeCharts(){
+  const hist=S.hist;
+  if(hist.length<2||Object.keys(timeCharts).length===0)return;
+
+  const te=hist[hist.length-1].t;
+  const ts=Math.max(0,te-HWIN);
+  const data=hist.filter(d=>d.t>=ts&&d.t<=te);
+  const labels=data.map(d=>d.t.toFixed(2));
+
+  // Delta chart
+  timeCharts.delta.data.labels=labels;
+  timeCharts.delta.data.datasets=[{label:'δ',data:data.map(d=>d.ddeg),borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)'}];
+  timeCharts.delta.update('none');
+
+  // Omega chart
+  timeCharts.omega.data.labels=labels;
+  timeCharts.omega.data.datasets=[{label:'Δω',data:data.map(d=>d.omega),borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)'}];
+  timeCharts.omega.update('none');
+
+  // Power chart
+  timeCharts.power.data.labels=labels;
+  timeCharts.power.data.datasets=[
+    {label:'Pe',data:data.map(d=>d.Pe),borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)'},
+    {label:'Pm',data:data.map(d=>d.Pm),borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)'}
+  ];
+  timeCharts.power.update('none');
+
+  // Frequency chart
+  timeCharts.freq.data.labels=labels;
+  timeCharts.freq.data.datasets=[
+    {label:'f',data:data.map(d=>d.f),borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)'},
+    {label:'fnom',data:data.map(d=>F0),borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1}
+  ];
+  timeCharts.freq.update('none');
+}
+
+function drawTime(){
+  updateTimeCharts();
 }
 
 // ================================================================
@@ -1530,6 +1523,7 @@ function moveTip(e){
 window.addEventListener('load',()=>{
   S=makeState();
   initDragHandles();
+  initTimeCharts();
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
   drawRLRChart(S);
   // Use nested RAF to ensure flex layout is computed before starting loop
