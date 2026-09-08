@@ -1128,11 +1128,20 @@ class ScaleStabilizer{
     if(minChange<this.tolerance&&maxChange<this.tolerance){
       return this.currentScale;
     }
-    // FIX: Use adaptive alpha based on magnitude of change
+    // FIX: Use adaptive strategy based on magnitude of change
+    // For very large changes (>40%), snap immediately instead of smoothing
+    // This prevents intermediate states from affecting subsequent small changes
     const maxChangeRatio=Math.max(minChange,maxChange);
-    const alpha=maxChangeRatio>1.0?0.9:(maxChangeRatio>0.5?0.7:0.3);
-    this.currentScale.min=this.currentScale.min*(1-alpha)+newScale.min*alpha;
-    this.currentScale.max=this.currentScale.max*(1-alpha)+newScale.max*alpha;
+
+    if(maxChangeRatio>0.4){
+      // Large change: snap to new scale immediately
+      this.currentScale={min:newScale.min,max:newScale.max};
+    }else{
+      // Medium change: use fast smoothing
+      const alpha=maxChangeRatio>0.15?0.6:0.3;
+      this.currentScale.min=this.currentScale.min*(1-alpha)+newScale.min*alpha;
+      this.currentScale.max=this.currentScale.max*(1-alpha)+newScale.max*alpha;
+    }
     return this.currentScale;
   }
   reset(){
@@ -1285,36 +1294,9 @@ function initTimeCharts(){
 let timeChartsResizeCounter=0;
 let lastChartW=0, lastChartH=0;
 function resizeTimeCharts(){
-  const pane=document.getElementById('pane3');
-  if(!pane||Object.keys(timeCharts).length===0)return;
-
-  // Debounce: only resize every 60 frames (~1 second)
-  timeChartsResizeCounter++;
-  if(timeChartsResizeCounter<60)return;
-  timeChartsResizeCounter=0;
-
-  const container=pane.querySelector('[data-chart-container]');
-  if(!container)return;
-
-  const rect=container.getBoundingClientRect();
-  const w=Math.floor(rect.width);
-  const h=Math.floor(rect.height);
-
-  if(w<10||h<10)return;
-
-  // Only resize if size changed significantly (>10px threshold to prevent thrashing)
-  if(Math.abs(w-lastChartW)<10&&Math.abs(h-lastChartH)<10)return;
-
-  lastChartW=w;
-  lastChartH=h;
-
-  Object.values(timeCharts).forEach(chart=>{
-    if(chart&&chart.canvas){
-      chart.canvas.width=w;
-      chart.canvas.height=h;
-      chart.resize();
-    }
-  });
+  // DISABLED: Chart resize causes layout thrashing and autoscroll
+  // Charts are sized once at init and never resized during animation loop
+  return;
 }
 
 let chartUpdateCounter=0;
@@ -1322,25 +1304,20 @@ function updateTimeCharts(){
   const hist=S.hist;
   if(hist.length<2||Object.keys(timeCharts).length===0)return;
 
-  // Throttle chart updates to every 3 frames to reduce layout thrashing
+  // Throttle chart updates to every 5 frames to reduce layout thrashing
   chartUpdateCounter++;
-  if(chartUpdateCounter<3)return;
+  if(chartUpdateCounter<5)return;
   chartUpdateCounter=0;
-
-  // Preserve scroll position during chart updates
-  const vizScroll=document.getElementById('vizScroll');
-  const savedScroll=vizScroll?vizScroll.scrollTop:0;
 
   const te=hist[hist.length-1].t;
   const ts=Math.max(0,te-HWIN);
   const data=hist.filter(d=>d.t>=ts&&d.t<=te);
 
-  // Calculate X-axis range with stable window
-  // Use fixed window size (HWIN) or actual data span if less than HWIN
-  const windowStart=ts;
-  const windowEnd=te;
-  const windowSize=windowEnd-windowStart;
-  const xMax=windowSize>HWIN?windowEnd:HWIN;
+  // Calculate X-axis range with sliding window
+  // xMin=0 until t=30s, then slides to maintain 30s window
+  // xMax always follows current time
+  const xMin=ts;
+  const xMax=te;
 
   // Delta chart with stabilized scale
   const deltaData=data.map(d=>({x:d.t,y:d.ddeg}));
@@ -1348,6 +1325,7 @@ function updateTimeCharts(){
   timeCharts.delta.data.datasets=[{label:'δ',data:deltaData,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)'}];
   timeCharts.delta.options.scales.y.min=deltaScale.min;
   timeCharts.delta.options.scales.y.max=deltaScale.max;
+  timeCharts.delta.options.scales.x.min=xMin;
   timeCharts.delta.options.scales.x.max=xMax;
   timeCharts.delta.update('none');
 
@@ -1357,6 +1335,7 @@ function updateTimeCharts(){
   timeCharts.omega.data.datasets=[{label:'Δω',data:omegaData,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)'}];
   timeCharts.omega.options.scales.y.min=omegaScale.min;
   timeCharts.omega.options.scales.y.max=omegaScale.max;
+  timeCharts.omega.options.scales.x.min=xMin;
   timeCharts.omega.options.scales.x.max=xMax;
   timeCharts.omega.update('none');
 
@@ -1370,6 +1349,7 @@ function updateTimeCharts(){
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
+  timeCharts.power.options.scales.x.min=xMin;
   timeCharts.power.options.scales.x.max=xMax;
   timeCharts.power.update('none');
 
@@ -1382,13 +1362,9 @@ function updateTimeCharts(){
   ];
   timeCharts.freq.options.scales.y.min=fScale.min;
   timeCharts.freq.options.scales.y.max=fScale.max;
+  timeCharts.freq.options.scales.x.min=xMin;
   timeCharts.freq.options.scales.x.max=xMax;
   timeCharts.freq.update('none');
-
-  // Restore scroll position after chart updates
-  if(vizScroll&&savedScroll!==undefined){
-    vizScroll.scrollTop=savedScroll;
-  }
 }
 
 function drawTime(){
@@ -1471,7 +1447,7 @@ function togglePane(n){
   [1,2,3].forEach(i=>{
     const p=document.getElementById('pane'+i);
     const b=document.getElementById('pt'+i);
-    if(p)p.style.display=paneVis[i-1]?'':none;
+    if(p)p.style.display=paneVis[i-1]?'':'none';
     if(b)b.classList.toggle('on',paneVis[i-1]);
   });
   phasorReady=false; pdInit=false;
@@ -1744,23 +1720,7 @@ window.addEventListener('load',()=>{
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
   drawRLRChart(S);
 
-  // Scroll position preservation to prevent autoscroll during Chart.js updates
-  let savedScrollTop=0;
-  const vizScroll=document.getElementById('vizScroll');
-  if(vizScroll){
-    // Save scroll position before any resize
-    vizScroll.addEventListener('scroll',()=>{
-      savedScrollTop=vizScroll.scrollTop;
-    },{passive:true});
-
-    // Restore scroll position after resize
-    const resizeObserver=new ResizeObserver(()=>{
-      if(vizScroll.scrollTop!==savedScrollTop&&savedScrollTop>0){
-        vizScroll.scrollTop=savedScrollTop;
-      }
-    });
-    resizeObserver.observe(vizScroll);
-  }
+  // No scroll preservation needed - disabled Chart.js resize() calls that cause layout shifts
 
   // Use nested RAF to ensure flex layout is computed before starting loop
   // This solves the blank panel bug (pane.clientWidth was 0 at synchronous load)

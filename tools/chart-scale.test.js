@@ -123,11 +123,20 @@ class ScaleStabilizer {
       return this.currentScale;
     }
 
-    // FIX: Use adaptive alpha based on magnitude of change
+    // FIX: Use adaptive strategy based on magnitude of change
+    // For very large changes (>40%), snap immediately instead of smoothing
+    // This prevents intermediate states from affecting subsequent small changes
     const maxChangeRatio = Math.max(minChange, maxChange);
-    const alpha = maxChangeRatio > 1.0 ? 0.9 : (maxChangeRatio > 0.5 ? 0.7 : 0.3);
-    this.currentScale.min = this.currentScale.min * (1 - alpha) + newScale.min * alpha;
-    this.currentScale.max = this.currentScale.max * (1 - alpha) + newScale.max * alpha;
+
+    if (maxChangeRatio > 0.4) {
+      // Large change: snap to new scale immediately
+      this.currentScale = { min: newScale.min, max: newScale.max };
+    } else {
+      // Medium change: use fast smoothing
+      const alpha = maxChangeRatio > 0.15 ? 0.6 : 0.3;
+      this.currentScale.min = this.currentScale.min * (1 - alpha) + newScale.min * alpha;
+      this.currentScale.max = this.currentScale.max * (1 - alpha) + newScale.max * alpha;
+    }
 
     return this.currentScale;
   }
