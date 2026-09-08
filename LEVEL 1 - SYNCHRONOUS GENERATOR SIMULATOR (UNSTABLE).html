@@ -144,10 +144,7 @@ input[type=number]:focus{border-color:var(--etap)}
 </div>
 <!-- HEADER -->
 <div class="hdr">
-  <div>
-    <div class="hdr-title">SYNC. GENERATOR SIMULATOR</div>
-    <div class="hdr-sub"><em>Sheva's_Simulator_Library &nbsp;·&nbsp; PLTU Thermal Unit &nbsp;·&nbsp; Classical E' Model + TGOV1</em></div>
-  </div>
+  <div class="hdr-title">SYNC. GENERATOR SIMULATOR</div>
   <div class="hdr-stats">
     <div class="hstat"><div class="hstat-lbl">δ Angle</div><div class="hstat-val" id="hd" style="color:var(--yellow)">0.00°</div></div>
     <div class="hstat"><div class="hstat-lbl">Δω Speed</div><div class="hstat-val" id="hw" style="color:var(--lime)">0.000000 pu</div></div>
@@ -1162,12 +1159,40 @@ function initTimeCharts(){
   const pane=document.getElementById('pane3');
   if(!pane)return;
 
-  // Clear existing content
-  pane.innerHTML='';
+  // Check if Chart.js is loaded
+  if(typeof Chart==='undefined'){
+    console.warn('Chart.js not loaded. Using fallback canvas rendering.');
+    // Fallback: keep original canvas for native rendering
+    const fallbackCanvas=document.getElementById('cv3');
+    if(fallbackCanvas){
+      const ctx=fallbackCanvas.getContext('2d');
+      if(ctx){
+        ctx.fillStyle='#f4f6fb';
+        ctx.fillRect(0,0,fallbackCanvas.width||400,fallbackCanvas.height||200);
+        ctx.fillStyle='#505878';
+        ctx.font='14px "EB Garamond",Georgia,serif';
+        ctx.textAlign='center';
+        ctx.fillText('Time Series Charts',200,80);
+        ctx.font='12px "EB Garamond",Georgia,serif';
+        ctx.fillStyle='#8090b0';
+        ctx.fillText('Chart.js failed to load from CDN',200,100);
+      }
+    }
+    return;
+  }
+
+  // Remove old canvas if exists, but keep vlabel and drag-handle
+  const oldCanvas=document.getElementById('cv3');
+  if(oldCanvas)oldCanvas.remove();
+
+  // Remove old chart container if exists
+  const oldContainer=pane.querySelector('[data-chart-container]');
+  if(oldContainer)oldContainer.remove();
 
   // Create container for 4 stacked charts with flexbox
   const container=document.createElement('div');
-  container.style.cssText='display:flex;flex-direction:column;gap:2px;height:100%;padding:6px;background:#f4f6fb;';
+  container.setAttribute('data-chart-container','true');
+  container.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;gap:2px;padding:6px;background:#f4f6fb;pointer-events:auto;';
 
   // Create chart wrappers with aspect ratio control + overflow:hidden to prevent Chart.js from affecting scroll
   for(let i=0;i<4;i++){
@@ -1177,10 +1202,24 @@ function initTimeCharts(){
     container.appendChild(wrapper);
   }
 
-  pane.appendChild(container);
+  // Insert container before drag-handle (so label and handle stay on top)
+  const dragHandle=pane.querySelector('.drag-handle');
+  if(dragHandle){
+    pane.insertBefore(container,dragHandle);
+  }else{
+    pane.appendChild(container);
+  }
 
   // Initialize Chart.js instances
   const canvases=container.querySelectorAll('canvas');
+
+  // Verify canvases have valid dimensions
+  canvases.forEach((canvas,i)=>{
+    const rect=canvas.getBoundingClientRect();
+    if(rect.width<1||rect.height<1){
+      console.warn(`Chart canvas ${i} has invalid dimensions: ${rect.width}x${rect.height}`);
+    }
+  });
   const baseOpts={
     responsive:true,
     maintainAspectRatio:false,
