@@ -1403,14 +1403,16 @@ function drawTime(){
 let isUserScrolling=false;
 let scrollLockTimeout=null;
 function renderAll(){
-  // Skip rendering if user is actively scrolling to prevent autoscroll
-  if(isUserScrolling)return;
-
+  // Always update SVG animations (phasor and P-delta) even during scroll
   updateSvgPhasor();
   updateSvgPdelta();
-  drawTime();
   updateHdr();
-  resizeTimeCharts();
+
+  // Only skip Chart.js updates during scroll (this is what causes autoscroll)
+  if(!isUserScrolling){
+    drawTime();
+    resizeTimeCharts();
+  }
 }
 function loop(ts){
   if(!lastRAF)lastRAF=ts;
