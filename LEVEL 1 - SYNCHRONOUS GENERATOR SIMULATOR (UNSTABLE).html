@@ -1374,7 +1374,12 @@ function drawTime(){
 // ================================================================
 // RENDER LOOP  — no guards, always draws
 // ================================================================
+let isUserScrolling=false;
+let scrollLockTimeout=null;
 function renderAll(){
+  // Skip rendering if user is actively scrolling to prevent autoscroll
+  if(isUserScrolling)return;
+
   updateSvgPhasor();
   updateSvgPdelta();
   drawTime();
