@@ -14,7 +14,7 @@ tanpa build step, tanpa framework. CSS inline, JavaScript inline.
 
 **Status:** UNSTABLE — masih dalam pengembangan. Label di nama file adalah resmi, jangan diubah.
 
-**Repo GitHub:** Belum ada (akan dibuat)
+**Repo GitHub:** https://github.com/endetta/synchronous-gen-simulator
 
 ## Pintu Masuk
 
@@ -22,6 +22,54 @@ tanpa build step, tanpa framework. CSS inline, JavaScript inline.
 - **Dokumentasi:** `docs/` — PRD, overview, referensi
 - **Testing:** `tools/` — harness testing (Node.js)
 - **Desain:** `design-plans/` — rencana fitur, log sesi
+
+## Tools & Test Harness (WAJIB DIPERHATIKAN SEBELUM TASK)
+
+**PENTING:** Sebelum mengerjakan task user, SELALU pertimbangkan tools/test berikut untuk mempercepat dan memaksimalkan hasil:
+
+### Test Harness Tersedia
+
+| Test File | Fungsi | Command | Status |
+|-----------|--------|---------|--------|
+| `tools/model.test.js` | Validasi physics engine (swing equation, EAC, RK4, governor) | `node tools/model.test.js` | ✅ 17 tests passing |
+| `tools/ui.test.js` | Validasi struktur HTML, DOM elements, UI controls | `node tools/ui.test.js` | ✅ 79 tests passing |
+| `tools/chart-scale.test.js` | Validasi scale stabilizer untuk time series charts | `node tools/chart-scale.test.js` | ✅ 17 tests passing |
+
+**Total: 113 tests passing** — Jalankan sebelum dan sesudah perubahan signifikan.
+
+### Kapan Menggunakan Test Harness
+
+1. **Sebelum task:**
+   - Cek apakah fitur yang akan diubah punya test coverage
+   - Baca test file untuk memahami expected behavior
+   - Gunakan sebagai "living documentation"
+
+2. **Selama task:**
+   - Jalankan test spesifik untuk verifikasi incremental
+   - Tambah test case baru jika menemukan edge case
+
+3. **Sesudah task:**
+   - Jalankan semua tests: `node tools/model.test.js && node tools/ui.test.js && node tools/chart-scale.test.js`
+   - Pastikan tidak ada regression
+   - Commit hanya jika semua tests pass
+
+### Tools Lainnya
+
+| Tool | Fungsi | Command | Catatan |
+|------|--------|---------|---------|
+| `tools/shoot.js` | Screenshot automation untuk 8 view states | `node tools/shoot.js` | ⚠️ Chrome headless issue (manual testing preferred) |
+| `tools/lens-harness.js` | Mock-DOM harness untuk load simulator di Node.js | Required oleh test files | Jangan diubah tanpa alasan kuat |
+
+### Workflow dengan Test Harness
+
+```
+User request → Baca CLAUDE.md → Cek relevant tests → Implementasi → Run tests → Verify pass → Commit
+```
+
+**Contoh:**
+- Task: "Fix bug di physics engine" → Jalankan `model.test.js` dulu untuk lihat expected behavior
+- Task: "Ubah UI parameter inputs" → Jalankan `ui.test.js` untuk cek struktur yang diharapkan
+- Task: "Improve chart rendering" → Jalankan `chart-scale.test.js` untuk verifikasi scale logic
 
 ## Model Fisika (Sumber Kebenaran)
 
@@ -61,10 +109,20 @@ di mana:
 2. **Tidak ada build.** Jalankan dengan membuka `.html` langsung di browser, atau
    `python -m http.server` / `npx serve` untuk live reload.
 
-3. **Validasi.** Belum ada test harness formal. Validasi manual dengan:
-   - Buka di browser (Chrome/Firefox)
-   - Jalankan preset scenarios
+3. **Validasi.** Test harness formal tersedia di `tools/`. Jalankan sebelum dan sesudah perubahan:
+   ```bash
+   # Run all tests
+   node tools/model.test.js && node tools/ui.test.js && node tools/chart-scale.test.js
+   
+   # Or individual tests
+   node tools/model.test.js      # Physics validation (17 tests)
+   node tools/ui.test.js          # UI structure (79 tests)
+   node tools/chart-scale.test.js # Chart rendering (17 tests)
+   ```
+   
+   Manual browser testing tetap diperlukan untuk:
    - Verifikasi visual: phasor animation, P-δ curve, time series
+   - Interaksi user: parameter inputs, mode switching, preset scenarios
    - Cek console untuk error
 
 4. **Jangan mengubah nama file HTML.** Nama file dengan label UNSTABLE adalah resmi.
@@ -123,11 +181,12 @@ di mana:
 
 ## Roadmap
 
-- [ ] Stabilisasi fitur core
-- [ ] Test harness dengan Node.js (lens-harness.js)
-- [ ] Screenshot automation (shoot.js)
+- [x] Test harness dengan Node.js (lens-harness.js) — ✅ 113 tests passing
+- [x] GitHub repo initialization — ✅ https://github.com/endetta/synchronous-gen-simulator
+- [x] Chart.js integration untuk time series visualization
+- [ ] Stabilisasi fitur core — manual browser testing
+- [ ] Screenshot automation (shoot.js) — ⚠️ Chrome headless issue
 - [ ] Dokumentasi PRD formal
-- [ ] GitHub repo initialization
 - [ ] CI/CD dengan GitHub Actions
 
 ## Catatan Penting
