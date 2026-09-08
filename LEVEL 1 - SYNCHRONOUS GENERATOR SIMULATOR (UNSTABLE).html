@@ -54,7 +54,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .ptlbl{font-family:var(--serif);font-size:9px;color:var(--dim2);letter-spacing:1px;text-transform:uppercase}
 .ptbtn{padding:2px 10px;border:1px solid var(--brd2);border-radius:3px;font-family:var(--serif);font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);background:var(--surf);cursor:pointer;transition:all .15s}
 .ptbtn.on{background:var(--etap);border-color:var(--etap);color:#fff}
-.viz-scroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;will-change:transform;overscroll-behavior:contain}
+.viz-scroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;will-change:scroll-position;overscroll-behavior:contain;scroll-behavior:auto}
 .viz-scroll::-webkit-scrollbar{width:4px}
 .viz-scroll::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
 .vpane{position:relative;overflow:hidden;background:var(--surf);border-bottom:1px solid var(--brd)}
@@ -1116,20 +1116,27 @@ class ScaleStabilizer{
       return this.currentScale;
     }
     const range=this.currentScale.max-this.currentScale.min;
-    if(range===0)return this.currentScale;
+    const newRange=newScale.max-newScale.min;
+    // FIX: Handle zero range cases by accepting the new scale directly
+    if(range===0||newRange===0){
+      this.currentScale={min:newScale.min,max:newScale.max};
+      return this.currentScale;
+    }
     const minChange=Math.abs(newScale.min-this.currentScale.min)/range;
     const maxChange=Math.abs(newScale.max-this.currentScale.max)/range;
     // Ignore small changes
     if(minChange<this.tolerance&&maxChange<this.tolerance){
       return this.currentScale;
     }
-    // Smooth transition
-    const alpha=0.3;
+    // FIX: Use adaptive alpha based on magnitude of change
+    const maxChangeRatio=Math.max(minChange,maxChange);
+    const alpha=maxChangeRatio>1.0?0.9:(maxChangeRatio>0.5?0.7:0.3);
     this.currentScale.min=this.currentScale.min*(1-alpha)+newScale.min*alpha;
     this.currentScale.max=this.currentScale.max*(1-alpha)+newScale.max*alpha;
     return this.currentScale;
   }
   reset(){
+    this.scaleHistory=[];
     this.currentScale=null;
   }
 }
@@ -1221,91 +1228,167 @@ function initTimeCharts(){
     }
   });
   const baseOpts={
-    responsive:true,
+    responsive:false,
     maintainAspectRatio:false,
     animation:false,
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:false,position:'top'},tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}},
-    scales:{x:{display:true,grid:{display:true,color:'#e8ecf4'},ticks:{color:'#3a4465',font:{size:10},maxTicksLimit:5},border:{color:'#ccd2e0'}},y:{display:true,grid:{color:'#e8ecf4'},ticks:{color:'#3a4465',font:{size:10}},border:{color:'#ccd2e0'}}},
+    scales:{
+      x:{
+        type:'linear',
+        display:true,
+        min:0,
+        max:30,
+        grid:{display:true,color:'#e8ecf4'},
+        ticks:{color:'#3a4465',font:{size:10},stepSize:5},
+        border:{color:'#ccd2e0'},
+        title:{display:true,text:'Time (s)',color:'#3a4465'}
+      },
+      y:{
+        display:true,
+        grid:{color:'#e8ecf4'},
+        ticks:{color:'#3a4465',font:{size:10}},
+        border:{color:'#ccd2e0'}
+      }
+    },
     elements:{point:{radius:0,hoverRadius:3},line:{tension:0.3,borderWidth:2}}
   };
 
   timeCharts.delta=new Chart(canvases[0],{
     type:'line',
-    data:{labels:[],datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'δ (degrees)',color:'#806000',font:{weight:'bold'}}}}}
+    data:{datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'δ (degrees)',color:'#806000',font:{weight:'bold'}}}}}
   });
 
   timeCharts.omega=new Chart(canvases[1],{
     type:'line',
-    data:{labels:[],datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold'}}}}}
+    data:{datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold'}}}}}
   });
 
   timeCharts.power=new Chart(canvases[2],{
     type:'line',
-    data:{labels:[],datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold'}}}}}
+    data:{datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold'}}}}}
   });
 
   timeCharts.freq=new Chart(canvases[3],{
     type:'line',
-    data:{labels:[],datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Time (s)',color:'#3a4465'}},y:{...baseOpts.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold'}}}}}
+    data:{datasets:[]},
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold'}}}}}
+  });
+
+  // Set initial canvas sizes
+  resizeTimeCharts();
+}
+
+let timeChartsResizeCounter=0;
+let lastChartW=0, lastChartH=0;
+function resizeTimeCharts(){
+  const pane=document.getElementById('pane3');
+  if(!pane||Object.keys(timeCharts).length===0)return;
+
+  // Debounce: only resize every 60 frames (~1 second)
+  timeChartsResizeCounter++;
+  if(timeChartsResizeCounter<60)return;
+  timeChartsResizeCounter=0;
+
+  const container=pane.querySelector('[data-chart-container]');
+  if(!container)return;
+
+  const rect=container.getBoundingClientRect();
+  const w=Math.floor(rect.width);
+  const h=Math.floor(rect.height);
+
+  if(w<10||h<10)return;
+
+  // Only resize if size changed significantly (>10px threshold to prevent thrashing)
+  if(Math.abs(w-lastChartW)<10&&Math.abs(h-lastChartH)<10)return;
+
+  lastChartW=w;
+  lastChartH=h;
+
+  Object.values(timeCharts).forEach(chart=>{
+    if(chart&&chart.canvas){
+      chart.canvas.width=w;
+      chart.canvas.height=h;
+      chart.resize();
+    }
   });
 }
 
+let chartUpdateCounter=0;
 function updateTimeCharts(){
   const hist=S.hist;
   if(hist.length<2||Object.keys(timeCharts).length===0)return;
 
+  // Throttle chart updates to every 3 frames to reduce layout thrashing
+  chartUpdateCounter++;
+  if(chartUpdateCounter<3)return;
+  chartUpdateCounter=0;
+
+  // Preserve scroll position during chart updates
+  const vizScroll=document.getElementById('vizScroll');
+  const savedScroll=vizScroll?vizScroll.scrollTop:0;
+
   const te=hist[hist.length-1].t;
   const ts=Math.max(0,te-HWIN);
   const data=hist.filter(d=>d.t>=ts&&d.t<=te);
-  const labels=data.map(d=>d.t.toFixed(2));
+
+  // Calculate X-axis range with stable window
+  // Use fixed window size (HWIN) or actual data span if less than HWIN
+  const windowStart=ts;
+  const windowEnd=te;
+  const windowSize=windowEnd-windowStart;
+  const xMax=windowSize>HWIN?windowEnd:HWIN;
 
   // Delta chart with stabilized scale
-  const deltaData=data.map(d=>d.ddeg);
-  const deltaScale=chartStabilizers.delta.update(calcYScale(deltaData,0.1));
-  timeCharts.delta.data.labels=labels;
+  const deltaData=data.map(d=>({x:d.t,y:d.ddeg}));
+  const deltaScale=chartStabilizers.delta.update(calcYScale(data.map(d=>d.ddeg),0.1));
   timeCharts.delta.data.datasets=[{label:'δ',data:deltaData,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)'}];
   timeCharts.delta.options.scales.y.min=deltaScale.min;
   timeCharts.delta.options.scales.y.max=deltaScale.max;
+  timeCharts.delta.options.scales.x.max=xMax;
   timeCharts.delta.update('none');
 
   // Omega chart with stabilized scale
-  const omegaData=data.map(d=>d.omega);
-  const omegaScale=chartStabilizers.omega.update(calcYScale(omegaData,0.1));
-  timeCharts.omega.data.labels=labels;
+  const omegaData=data.map(d=>({x:d.t,y:d.omega}));
+  const omegaScale=chartStabilizers.omega.update(calcYScale(data.map(d=>d.omega),0.1));
   timeCharts.omega.data.datasets=[{label:'Δω',data:omegaData,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)'}];
   timeCharts.omega.options.scales.y.min=omegaScale.min;
   timeCharts.omega.options.scales.y.max=omegaScale.max;
+  timeCharts.omega.options.scales.x.max=xMax;
   timeCharts.omega.update('none');
 
   // Power chart with stabilized scale
-  const peData=data.map(d=>d.Pe);
-  const pmData=data.map(d=>d.Pm);
-  const powerScale=chartStabilizers.power.update(calcYScale([...peData,...pmData],0.1));
-  timeCharts.power.data.labels=labels;
+  const peData=data.map(d=>({x:d.t,y:d.Pe}));
+  const pmData=data.map(d=>({x:d.t,y:d.Pm}));
+  const powerScale=chartStabilizers.power.update(calcYScale([...data.map(d=>d.Pe),...data.map(d=>d.Pm)],0.1));
   timeCharts.power.data.datasets=[
     {label:'Pe',data:peData,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)'},
     {label:'Pm',data:pmData,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)'}
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
+  timeCharts.power.options.scales.x.max=xMax;
   timeCharts.power.update('none');
 
   // Frequency chart with stabilized scale (centered at 50 Hz)
-  const fData=data.map(d=>d.f);
-  const fScale=chartStabilizers.freq.update(calcYScale(fData,0.05));
-  timeCharts.freq.data.labels=labels;
+  const fData=data.map(d=>({x:d.t,y:d.f}));
+  const fScale=chartStabilizers.freq.update(calcYScale(data.map(d=>d.f),0.05));
   timeCharts.freq.data.datasets=[
     {label:'f',data:fData,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)'},
-    {label:'fnom',data:data.map(d=>F0),borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1}
+    {label:'fnom',data:data.map(d=>({x:d.t,y:F0})),borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1}
   ];
   timeCharts.freq.options.scales.y.min=fScale.min;
   timeCharts.freq.options.scales.y.max=fScale.max;
+  timeCharts.freq.options.scales.x.max=xMax;
   timeCharts.freq.update('none');
+
+  // Restore scroll position after chart updates
+  if(vizScroll&&savedScroll!==undefined){
+    vizScroll.scrollTop=savedScroll;
+  }
 }
 
 function drawTime(){
@@ -1320,6 +1403,7 @@ function renderAll(){
   updateSvgPdelta();
   drawTime();
   updateHdr();
+  resizeTimeCharts();
 }
 function loop(ts){
   if(!lastRAF)lastRAF=ts;
