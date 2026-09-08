@@ -106,7 +106,8 @@ console.log('\nTest 3: Critical Clearing Angle');
 const dcc = getCC(Pm, Pmax);
 assert(dcc !== null, 'δ_cc calculation returns value');
 if (dcc) {
-  assertClose(dcc, 1.8326, 0.05, 'δ_cc ≈ 105° (2.3 rad)');
+  // δ_cc = 1.21 rad ≈ 69.3° for Pm=0.8, Pmax=1.25
+  assertClose(dcc, 1.21, 0.05, 'δ_cc ≈ 69° (1.21 rad)');
 
   // Test 4: Critical Clearing Time
   console.log('\nTest 4: Critical Clearing Time');
@@ -114,8 +115,8 @@ if (dcc) {
   const cct = getCCT(H, dcc, d0, Pm);
   assert(cct !== null, 'CCT calculation returns value');
   if (cct) {
-    // Expected CCT ≈ 0.4-0.5 s for typical PLTU parameters
-    assert(cct > 0.3 && cct < 0.6, 'CCT in reasonable range (0.3-0.6 s)');
+    // Expected CCT ≈ 0.2-0.3 s for given parameters
+    assert(cct > 0.1 && cct < 0.4, 'CCT in reasonable range (0.1-0.4 s)');
   }
 }
 
@@ -125,7 +126,8 @@ const H_test = 8;
 const D_test = 4;
 const Ks = Pmax * Math.cos(d0); // Synchronizing coefficient
 const Tosc = getTosc(H_test, Ks);
-assertClose(Tosc, 2.8, 0.5, 'T_osc ≈ 2.8 s for H=8, Pmax=1.25, δ₀=0.69');
+// T_osc = 2π√(2H/(ωs·Ks)) ≈ 1.45 s for H=8, Pmax=1.25, Ks≈0.951
+assertClose(Tosc, 1.45, 0.1, 'T_osc ≈ 1.45 s for H=8, Pmax=1.25, δ₀=0.69');
 
 // Test 6: RK4 Integration Stability
 console.log('\nTest 6: RK4 Integration Stability');
@@ -175,7 +177,8 @@ assert(E_k > 0, 'Kinetic energy positive');
 // Test 9: Loss of Synchronism Detection
 console.log('\nTest 9: Loss of Synchronism Detection');
 const d_cr = Math.PI - d0;
-assertClose(d_cr * R2D, 110.2, 1, 'δ_cr = π - δ₀ ≈ 110°');
+// δ_cr = π - δ₀ ≈ π - 0.6947 ≈ 2.447 rad ≈ 140.2°
+assertClose(d_cr * R2D, 140.2, 1, 'δ_cr = π - δ₀ ≈ 140°');
 
 // If δ > δ_cr, system loses synchronism
 const d_unstable = d_cr + 0.1;

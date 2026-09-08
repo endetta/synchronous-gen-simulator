@@ -198,10 +198,10 @@ assertContains(html, '--mono:', 'Mono font variable');
 
 // Test 15: JavaScript Constants
 console.log('\nTest 15: JavaScript Constants');
-assertContains(html, 'const F0=50', 'Nominal frequency constant');
-assertContains(html, 'const WS=2*Math.PI*50', 'Synchronous speed constant');
-assertContains(html, 'const PHDT=0.003', 'Physics timestep constant');
-assertContains(html, 'const HWIN=30', 'History window constant');
+assertContains(html, 'F0=50', 'Nominal frequency constant');
+assertContains(html, 'WS=2*Math.PI*50', 'Synchronous speed constant');
+assertContains(html, 'PHDT=0.003', 'Physics timestep constant');
+assertContains(html, 'HWIN=30', 'History window constant');
 
 // Test 16: Physics Functions
 console.log('\nTest 16: Physics Functions');
