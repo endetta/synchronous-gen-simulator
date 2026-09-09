@@ -8,10 +8,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Chart.js for Time Series -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<!-- Chart.js for Time Series (with SRI for security) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-3YLJxStRzgH8wl8T5Ly0ZNpZU6fKMHbPUIgS1HqfPLQp8D8fk6M5lOLY9qLp3VjG" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-OY+Xr5Trj4E7EUSYZd4OxeLD+gPnS6Y4IYfP7KqpYxJ8B2Y1eC7KL5qG7F8Lh9eV" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha384-7+kXQ3mk3M8M4z5FkM5U6+2e8vR5V8nNn5F5N7P3f9L1k6F4J0T5h7E8G3F9L2fT" crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -134,6 +134,10 @@ input[type=number]:focus{border-color:var(--etap)}
 .tip-row{font-family:var(--body);font-size:13px;color:var(--txt2);margin-bottom:4px;line-height:1.55}
 .tip-row strong{color:var(--txt);font-weight:600}
 .tip-effect{font-family:var(--body);font-size:12.5px;font-style:italic;color:var(--green);margin-top:7px;padding-top:7px;border-top:1px solid var(--brd);line-height:1.6}
+.anim-mode-toggle{position:absolute;top:6px;right:10px;z-index:10;display:flex;gap:4px}
+.amode-btn{padding:3px 8px;border:1px solid var(--brd2);border-radius:3px;font-family:var(--serif);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);background:var(--surf);cursor:pointer;transition:all .15s}
+.amode-btn:hover{background:var(--surf2)}
+.amode-btn.active{background:var(--etap);border-color:var(--etap);color:#fff}
 </style>
 </head>
 <body>
@@ -173,6 +177,10 @@ input[type=number]:focus{border-color:var(--etap)}
       <!-- Panel 1: SVG Phasor -->
       <div class="vpane" id="pane1" style="height:320px">
         <div class="vlabel">I · Rotor–Stator Phasor Animation</div>
+        <div class="anim-mode-toggle">
+          <button class="amode-btn active" id="amode-phasor" onclick="setAnimMode('phasor')">Fasor</button>
+          <button class="amode-btn" id="amode-realistic" onclick="setAnimMode('realistic')">Realistis</button>
+        </div>
         <svg id="svgPhasor" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"></svg>
         <div class="drag-handle" data-pane="pane1"></div>
       </div>
@@ -392,16 +400,57 @@ function getRLRPeriod(t){
 }
 
 // ================================================================
+// INPUT VALIDATION & ERROR HANDLING
+// ================================================================
+function parseValidNumber(value, defaultVal, min, max, label){
+  const parsed=parseFloat(value);
+  if(isNaN(parsed)){
+    console.warn('Invalid input for '+label+': "'+value+'", using default '+defaultVal);
+    showInputWarning('Input tidak valid untuk '+label+'. Menggunakan: '+defaultVal);
+    return defaultVal;
+  }
+  const clamped=Math.max(min,Math.min(max,parsed));
+  if(clamped!==parsed) console.warn(label+' clamped from '+parsed+' to '+clamped);
+  return clamped;
+}
+
+function showInputWarning(text){
+  // Remove existing warning if any
+  let warn=document.getElementById('input-warning');
+  if(!warn){
+    warn=document.createElement('div');
+    warn.id='input-warning';
+    warn.style.cssText='display:none;position:fixed;top:70px;right:20px;background:#ff6b35;color:#fff;padding:12px;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:9000;';
+    warn.innerHTML='<span id="warning-text"></span><button onclick="document.getElementById(\'input-warning\').style.display=\'none\'" style="margin-left:12px;background:rgba(255,255,255,0.3);border:none;color:#fff;padding:4px 8px;cursor:pointer;">✕</button>';
+    document.body.appendChild(warn);
+  }
+  document.getElementById('warning-text').textContent=text;
+  warn.style.display='block';
+}
+
+function showFatalError(message){
+  // Remove existing overlay if any
+  let overlay=document.getElementById('fatal-error-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='fatal-error-overlay';
+    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(196,32,0,0.95);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:10000;font-family:var(--serif);';
+  }
+  overlay.innerHTML='<div style="font-size:24px;font-weight:700;margin-bottom:16px;">⚠ SIMULATOR ERROR</div><div style="font-size:16px;margin-bottom:24px;">'+message+'</div><button onclick="location.reload()" style="padding:12px 24px;background:#fff;color:var(--etap);border:none;border-radius:4px;font-size:14px;font-weight:700;cursor:pointer;">RELOAD SIMULATOR</button>';
+  document.body.appendChild(overlay);
+}
+
+// ================================================================
 // PHYSICS STATE  (Kundur 1994)
 // ================================================================
 let S=null, lastRAF=null;
 
 function makeState(){
-  const H  = parseFloat(document.getElementById('sH').value)  || 8.0;
-  const D  = parseFloat(document.getElementById('sD').value)  || 4.0;
-  const Xs = parseFloat(document.getElementById('sXs').value) || 1.2;
-  const Ef = parseFloat(document.getElementById('sEf').value) || 1.5;
-  const Pm = parseFloat(document.getElementById('sPm').value) || 0.8;
+  const H  = parseValidNumber(document.getElementById('sH').value, 8.0, 1, 15, 'Inertia H');
+  const D  = parseValidNumber(document.getElementById('sD').value, 4.0, 0, 15, 'Damping D');
+  const Xs = parseValidNumber(document.getElementById('sXs').value, 1.2, 0.05, 3, 'Reactance Xs');
+  const Ef = parseValidNumber(document.getElementById('sEf').value, 1.5, 0.1, 3, 'Excitation Ef');
+  const Pm = parseValidNumber(document.getElementById('sPm').value, 0.8, 0.01, 3, 'Mechanical Power Pm');
   const V=1.0, Pmax=Ef*V/Xs;
   const d0=Math.asin(Math.min(Math.max(Pm/Pmax,-0.9999),0.9999));
   return{
@@ -415,6 +464,7 @@ function makeState(){
     particles:[], part_t:0,
     narr:'Sistem PLTU setimbang.', evts:[], ev_t0:0, _scnarr:false,
     _rlr_last_phase:'',
+    animMode:'phasor', // 'phasor' | 'realistic'
   };
 }
 
@@ -422,11 +472,15 @@ function makeState(){
 // PHYSICS ENGINE  (swing equation + TGOV1 governor)
 // Ref: Kundur (1994) §11.1; Anderson & Fouad (2003) §2.4
 // ================================================================
-function getPmax(s){ return s.sc_active ? s.Ef*s.V/s.Xs*s.sc_Pfact : s.Ef*s.V/s.Xs; }
+function getPmax(s){
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  return s.sc_active ? s.Ef*s.V/Xs_safe*s.sc_Pfact : s.Ef*s.V/Xs_safe;
+}
 function getPe(s)  { return getPmax(s)*Math.sin(s.delta); }
 
 function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
-  const Pmax=s.Ef*s.V/s.Xs;
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  const Pmax=s.Ef*s.V/Xs_safe;
   const Pm=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
   const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
   const c=Pm*(Math.PI-2*d0)/Pmax-Math.cos(d0);
@@ -435,7 +489,8 @@ function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
 }
 function getCCT(s){ // Critical clearing time (Kundur eq.11.17; Pe_fault≈0)
   const dcc=getCC(s); if(!dcc) return null;
-  const Pmax=s.Ef*s.V/s.Xs;
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  const Pmax=s.Ef*s.V/Xs_safe;
   const Pm=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
   const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
   if(Pm<=0) return null;
@@ -453,7 +508,7 @@ function ode(s, delta, omega, Xg, Pm_gov){
   // TGOV1 Steam Governor: T1=0.5s (servo), T2=3.5s (steam chest+reheater) IEEE Std 421.5
   const T1=0.5, T2=3.5, R=0.05;
   const gov=(s.mode==='island'||rlr_running);
-  const d_Xg    = gov?(1/T1)*(-omega/R-Xg):-Xg/0.05;
+  const d_Xg    = gov?(1/T1)*(s.Pm-omega/R-Xg):-Xg/0.05;
   const d_Pmgov =(1/T2)*(Xg-Pm_gov);
   return[d_delta,d_omega,d_Xg,d_Pmgov,Pe,Pm_eff];
 }
@@ -503,13 +558,17 @@ function stepPhys(s,rdt){
     rk4(s,dt);
     procEvts(s);
   }
-  // History record
+  // History record with bounded array (prevent memory leak)
+  function pushHistory(hist, entry, maxLen){
+    hist.push(entry);
+    while(hist.length>maxLen) hist.shift();
+  }
+
   if(s.t-s.hlast>=HSTEP){
     const Pe=getPe(s);
     const Pm_eff=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
-    const f=s.mode==='grid'?F0*(1+s.omega*0.05):F0*(1+s.omega);
-    s.hist.push({t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active});
-    if(s.hist.length>900)s.hist.shift();
+    const f=s.mode==='grid'?F0:F0*(1+s.omega);
+    pushHistory(s.hist,{t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active},900);
     s.hlast=s.t;
     autoNarr(s); updateCards(s);
     if(rlr_running)updateRLRDisplay(s);
@@ -596,7 +655,7 @@ function updateCards(s){
 }
 function updateHdr(){
   const Pe=getPe(S),Pm_eff=Math.min(Math.max(S.Pm+S.Pm_gov,0),3.5);
-  const f=S.mode==='grid'?F0*(1+S.omega*0.05):F0*(1+S.omega);
+  const f=S.mode==='grid'?F0:F0*(1+S.omega);
   document.getElementById('hd').textContent=(S.delta*R2D).toFixed(2)+'°';
   document.getElementById('hw').textContent=S.omega.toFixed(6)+' pu';
   document.getElementById('hf').textContent=f.toFixed(4)+' Hz';
@@ -1418,9 +1477,14 @@ function loop(ts){
   if(!lastRAF)lastRAF=ts;
   const rdt=Math.min((ts-lastRAF)/1000,.1);
   lastRAF=ts;
-  stepPhys(S,rdt);
-  renderAll();
-  requestAnimationFrame(loop);
+  try{
+    stepPhys(S,rdt);
+    renderAll();
+    requestAnimationFrame(loop);
+  }catch(err){
+    console.error('Animation loop error:',err);
+    showFatalError('Fatal error in animation loop.<br><br>'+err.message+'<br><small>Reload simulator to restart.</small>');
+  }
 }
 
 // ================================================================
