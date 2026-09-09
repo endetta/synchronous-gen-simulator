@@ -60,7 +60,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .vpane{position:relative;overflow:hidden;background:var(--surf);border-bottom:1px solid var(--brd);contain:layout style}
 .vpane:last-child{border-bottom:none}
 .vlabel{position:absolute;top:6px;left:10px;z-index:5;pointer-events:none;font-family:var(--serif);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--dim);background:rgba(255,255,255,.85);padding-right:4px}
-.vpane>svg,.vpane>canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%}
+.vpane>svg,.vpane>canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .drag-handle{position:absolute;bottom:0;left:0;right:0;height:7px;cursor:ns-resize;background:linear-gradient(to bottom,transparent,rgba(184,192,212,.45));z-index:10}
 .drag-handle:hover{background:linear-gradient(to bottom,transparent,rgba(196,32,0,.2))}
 .drag-handle::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:32px;height:2px;border-radius:2px;background:rgba(160,170,192,.6)}
@@ -786,6 +786,12 @@ function updateSvgPhasor(){
   const svg=document.getElementById('svgPhasor');
   if(!svg) return;
 
+  // Dispatch to realistic mode if active
+  if(S && S.animMode==='realistic'){
+    updateSvgPhasorRealistic(svg);
+    return;
+  }
+
   // Debounce size checks: only read clientWidth/clientHeight every 10 frames
   ph_sizeCheckCounter++;
   let w=ph_lastW, h=ph_lastH;
@@ -929,6 +935,193 @@ function updateSvgPhasor(){
     if(!dpLeftCache)dpLeftCache={children:Array.from(leftEl.children)};
     if(!dpRightCache)dpRightCache={children:Array.from(rightEl.children)};
   }
+}
+
+// ================================================================
+// REALISTIC ROTOR-STATOR ANIMATION
+// ================================================================
+let realInit=false, real_lastW=0, real_lastH=0;
+
+function initSvgRealistic(svg,w,h){
+  svg.innerHTML='';
+  const cx=w/2, cy=h/2, R=Math.min(h*0.38,w*0.28);
+
+  // Definitions (gradients)
+  const defs=mkSvg('defs');
+
+  // Stator gradient
+  const sg=mkSvg('radialGradient',{id:'stator-grad',cx:'50%',cy:'50%',r:'50%'});
+  sg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'#e8ecf4'}));
+  sg.appendChild(mkSvg('stop',{'offset':'70%','stop-color':'#d0d8e8'}));
+  sg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'#b8c0d0'}));
+  defs.appendChild(sg);
+
+  // Rotor gradient
+  const rg=mkSvg('radialGradient',{id:'rotor-grad',cx:'50%',cy:'50%',r:'50%'});
+  rg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'#404860'}));
+  rg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'#202838'}));
+  defs.appendChild(rg);
+
+  // Field gradients
+  const rfg=mkSvg('radialGradient',{id:'rotor-field-grad',cx:'50%',cy:'50%',r:'60%'});
+  rfg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'rgba(0,80,200,0.6)'}));
+  rfg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'rgba(0,80,200,0)'}));
+  defs.appendChild(rfg);
+
+  const sfg=mkSvg('radialGradient',{id:'stator-field-grad',cx:'50%',cy:'50%',r:'60%'});
+  sfg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'rgba(200,80,0,0.5)'}));
+  sfg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'rgba(200,80,0,0)'}));
+  defs.appendChild(sfg);
+
+  svg.appendChild(defs);
+
+  // Stator outer ring (housing)
+  svg.appendChild(mkSvg('circle',{id:'stator-outer',cx:cx,cy:cy,r:R*1.1,fill:'#a0a8b8',stroke:'#808898','stroke-width':3}));
+
+  // Stator core (laminated iron)
+  svg.appendChild(mkSvg('circle',{id:'stator-core',cx:cx,cy:cy,r:R,fill:'url(#stator-grad)',stroke:'#8088a0','stroke-width':2}));
+
+  // Stator slots (36 slots for 3-phase)
+  const slots=36;
+  for(let i=0;i<slots;i++){
+    const ang=i*2*Math.PI/slots;
+    const x1=cx+(R*0.72)*Math.cos(ang);
+    const y1=cy+(R*0.72)*Math.sin(ang);
+    const x2=cx+(R*0.92)*Math.cos(ang);
+    const y2=cy+(R*0.92)*Math.sin(ang);
+    svg.appendChild(mkSvg('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:'#606878','stroke-width':1.5,'stroke-linecap':'round'}));
+  }
+
+  // Stator 3-phase windings (copper coils)
+  const phases=[
+    {id:'A',color:'#c85000',offset:0},
+    {id:'B',color:'#0068a8',offset:2*Math.PI/3},
+    {id:'C',color:'#00a848',offset:4*Math.PI/3}
+  ];
+  phases.forEach(ph=>{
+    for(let i=0;i<6;i++){
+      const slotAng=ph.offset + i*Math.PI/3;
+      const sx1=cx+(R*0.74)*Math.cos(slotAng);
+      const sy1=cy+(R*0.74)*Math.sin(slotAng);
+      const sx2=cx+(R*0.88)*Math.cos(slotAng);
+      const sy2=cy+(R*0.88)*Math.sin(slotAng);
+      svg.appendChild(mkSvg('circle',{
+        id:`winding-${ph.id}-${i}`,
+        cx:(sx1+sx2)/2,
+        cy:(sy1+sy2)/2,
+        r:R*0.045,
+        fill:ph.color,
+        stroke:'#402000',
+        'stroke-width':0.8
+      }));
+    }
+  });
+
+  // Stator rotating field (animated)
+  svg.appendChild(mkSvg('circle',{id:'stator-field',cx:cx,cy:cy,r:R*0.65,fill:'url(#stator-field-grad)',opacity:0.6}));
+
+  // Air gap
+  svg.appendChild(mkSvg('circle',{id:'airgap',cx:cx,cy:cy,r:R*0.55,fill:'none',stroke:'#c0c8d8','stroke-width':1,'stroke-dasharray':'4,4'}));
+
+  // Rotor (cylindrical for turbo generator)
+  const rotorR=R*0.5;
+  svg.appendChild(mkSvg('circle',{id:'rotor-body',cx:cx,cy:cy,r:rotorR,fill:'url(#rotor-grad)',stroke:'#101828','stroke-width':2}));
+
+  // Rotor field winding animation (shows excitation)
+  svg.appendChild(mkSvg('circle',{id:'rotor-field',cx:cx,cy:cy,r:rotorR*0.9,fill:'url(#rotor-field-grad)'}));
+
+  // Rotor poles indication (N-S for 2-pole)
+  const poleAng=S?S.delta:0;
+  svg.appendChild(mkSvg('text',{id:'pole-N',x:cx+rotorR*0.6*Math.cos(poleAng-Math.PI/2),y:cy+rotorR*0.6*Math.sin(poleAng-Math.PI/2),fill:'#0068d8','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'N'));
+  svg.appendChild(mkSvg('text',{id:'pole-S',x:cx+rotorR*0.6*Math.cos(poleAng+Math.PI/2),y:cy+rotorR*0.6*Math.sin(poleAng+Math.PI/2),fill:'#d84000','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'S'));
+
+  // Shaft center
+  svg.appendChild(mkSvg('circle',{id:'shaft',cx:cx,cy:cy,r:R*0.08,fill:'#404858',stroke:'#303848','stroke-width':1.5}));
+
+  // Legend
+  drawRealisticLegend(svg,w,h);
+
+  realInit=true;
+  real_lastW=w;
+  real_lastH=h;
+}
+
+function updateSvgPhasorRealistic(svg){
+  const w=svg.clientWidth, h=svg.clientHeight;
+  if(w<10||h<10) return;
+
+  if(!realInit||Math.abs(w-real_lastW)>5||Math.abs(h-real_lastH)>5){
+    initSvgRealistic(svg,w,h);
+  }
+
+  if(!S) return;
+
+  const cx=w/2, cy=h/2, R=Math.min(h*0.38,w*0.28);
+  const rotorR=R*0.5;
+
+  // Update rotor position based on delta angle
+  const base=S.anim-Math.PI/2;
+  const rotorAng=base+S.delta;
+
+  // Update pole positions
+  const poleN=svg.querySelector('#pole-N');
+  const poleS=svg.querySelector('#pole-S');
+  if(poleN){
+    poleN.setAttribute('x',cx+rotorR*0.55*Math.cos(rotorAng));
+    poleN.setAttribute('y',cy+rotorR*0.55*Math.sin(rotorAng));
+  }
+  if(poleS){
+    poleS.setAttribute('x',cx+rotorR*0.55*Math.cos(rotorAng+Math.PI));
+    poleS.setAttribute('y',cy+rotorR*0.55*Math.sin(rotorAng+Math.PI));
+  }
+
+  // Update rotor field intensity based on Ef
+  const rotorField=svg.querySelector('#rotor-field');
+  if(rotorField){
+    const efNorm=Math.min(S.Ef/3,1);
+    rotorField.setAttribute('opacity',0.3+efNorm*0.5);
+    // Scale field radius with excitation
+    const fieldR=rotorR*(0.6+efNorm*0.3);
+    rotorField.setAttribute('r',fieldR);
+  }
+
+  // Update stator rotating field (rotates at sync speed)
+  const statorField=svg.querySelector('#stator-field');
+  if(statorField){
+    const syncAng=base; // Stator field rotates at sync speed
+    statorField.setAttribute('opacity',0.4+0.2*Math.sin(Date.now()/200));
+  }
+
+  // Update stator winding colors based on current phase
+  const phases=['A','B','C'];
+  const phaseColors=['#c85000','#0068a8','#00a848'];
+  const time=Date.now()/1000;
+  phases.forEach((ph,pi)=>{
+    const phaseAng=base+pi*2*Math.PI/3;
+    const intensity=0.5+0.5*Math.sin(time*10+pi*2*Math.PI/3); // Pulsing effect
+    for(let i=0;i<6;i++){
+      const coil=svg.querySelector(`#winding-${ph}-${i}`);
+      if(coil){
+        const baseColor=phaseColors[pi];
+        coil.setAttribute('opacity',0.4+intensity*0.6);
+      }
+    }
+  });
+}
+
+function drawRealisticLegend(svg,w,h){
+  const legendX=10, legendY=h-80;
+  const items=[
+    {label:'Stator Core',color:'#d0d8e8'},
+    {label:'Stator Windings (3-φ)',color:'#c85000'},
+    {label:'Rotor Field',color:'#404860'},
+    {label:'Rotor Excitation',color:'#0050c8'},
+  ];
+  items.forEach((it,i)=>{
+    const y=legendY+i*16;
+    svg.appendChild(mkSvg('rect',{x:legendX,y:y,width:12,height:12,fill:it.color,stroke:'#404858','stroke-width':0.5,'rx':2}));
+    svg.appendChild(mkSvg('text',{x:legendX+18,y:y+10,'font-size':11,fill:'#505868','font-family':'var(--body)'},it.label));
+  });
 }
 
 // ================================================================
@@ -1496,6 +1689,12 @@ function setMode(m){
   document.getElementById('bIsland').classList.toggle('on',m==='island');
   // Reset chart scales when mode changes
   Object.values(chartStabilizers).forEach(s=>s.reset());
+}
+function setAnimMode(mode){
+  if(!S) return;
+  S.animMode=mode;
+  document.getElementById('amode-phasor').classList.toggle('active',mode==='phasor');
+  document.getElementById('amode-realistic').classList.toggle('active',mode==='realistic');
 }
 function updTrack(el){
   const pct=((+el.value-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';
