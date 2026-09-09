@@ -1830,7 +1830,20 @@ function updateTimeCharts(){
 
   // Delta chart with FIXED scale (0-90°) for EAC context
   // T03: Fixed Y-axis range untuk konteks EAC (stability boundary di 90°)
-  timeCharts.delta.data.datasets=[{label:'δ',data:chartData.delta,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)',fill:false,tension:0.2}];
+  // T05: Semantic color coding berdasarkan fault phase
+  let deltaColor = '#806000'; // Default: normal (biru kecoklatan)
+  if(S.sc_on && S.sc_t0 > 0){
+    const faultOnsetTime = S.sc_t0 + S.sc_delay;
+    const faultClearingTime = faultOnsetTime + S.sc_dur;
+    const currentTime = te;
+    if(currentTime >= faultOnsetTime && currentTime < faultClearingTime){
+      deltaColor = 'rgba(196,32,0,1)'; // During fault: merah
+    } else if(currentTime >= faultClearingTime){
+      deltaColor = 'rgba(10,112,64,1)'; // Post-clearing: hijau
+    }
+  }
+
+  timeCharts.delta.data.datasets=[{label:'δ',data:chartData.delta,borderColor:deltaColor,backgroundColor:'rgba(128,96,0,0.05)',fill:false,tension:0.2}];
   timeCharts.delta.options.scales.y.min=0;
   timeCharts.delta.options.scales.y.max=90;
   timeCharts.delta.options.scales.x.min=xMin;
@@ -1882,167 +1895,200 @@ function updateTimeCharts(){
   timeCharts.delta.update('none');
 
   // Omega chart with stabilized scale
+  // T05: Semantic color coding for Δω
+  let omegaColor = '#3a6818'; // Default: normal (hijau)
+  let omegaAnnotations = {};
+  if(S.sc_on && S.sc_t0 > 0){
+    const faultOnsetTime = S.sc_t0 + S.sc_delay;
+    const faultClearingTime = faultOnsetTime + S.sc_dur;
+    const currentTime = te;
+    if(currentTime >= faultOnsetTime && currentTime < faultClearingTime){
+      omegaColor = 'rgba(196,32,0,1)'; // During fault: merah
+    } else if(currentTime >= faultClearingTime){
+      omegaColor = 'rgba(10,112,64,1)'; // Post-clearing: hijau
+    }
+    // T04: Event markers
+    omegaAnnotations = {
+      faultOnset: {
+        type: 'line',
+        xMin: faultOnsetTime,
+        borderColor: 'rgba(196,32,0,0.8)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: 'FAULT ON',
+          position: 'start',
+          backgroundColor: 'rgba(196,32,0,0.8)',
+          color: '#fff',
+          font: { size: 9, weight: 'bold' }
+        }
+      },
+      faultClearing: {
+        type: 'line',
+        xMin: faultClearingTime,
+        borderColor: 'rgba(10,112,64,0.8)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: 'FAULT CLEAR',
+          position: 'start',
+          backgroundColor: 'rgba(10,112,64,0.8)',
+          color: '#fff',
+          font: { size: 9, weight: 'bold' }
+        }
+      }
+    };
+  }
+
+  // T08: Zero-line emphasis for Δω chart
+  omegaAnnotations.zeroLine = {
+    type: 'line',
+    yMin: 0,
+    yMax: 0,
+    borderColor: 'rgba(58,68,101,0.8)',
+    borderWidth: 1.5
+  };
+
   const omegaScale=chartStabilizers.omega.update(calcYScale(chartData.omegaValues,0.1));
-  timeCharts.omega.data.datasets=[{label:'Δω',data:chartData.omega,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)',fill:false,tension:0.2}];
+  timeCharts.omega.data.datasets=[{label:'Δω',data:chartData.omega,borderColor:omegaColor,backgroundColor:'rgba(58,104,24,0.05)',fill:false,tension:0.2}];
   timeCharts.omega.options.scales.y.min=omegaScale.min;
   timeCharts.omega.options.scales.y.max=omegaScale.max;
   timeCharts.omega.options.scales.x.min=xMin;
   timeCharts.omega.options.scales.x.max=xMax;
-
-  // T04: Event markers for omega chart
-  if(S.sc_on && S.sc_t0 > 0){
-    const faultOnsetTime = S.sc_t0 + S.sc_delay;
-    const faultClearingTime = faultOnsetTime + S.sc_dur;
-
-    timeCharts.omega.options.plugins.annotation = {
-      annotations: {
-        faultOnset: {
-          type: 'line',
-          xMin: faultOnsetTime,
-          borderColor: 'rgba(196,32,0,0.8)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          label: {
-            display: true,
-            content: 'FAULT ON',
-            position: 'start',
-            backgroundColor: 'rgba(196,32,0,0.8)',
-            color: '#fff',
-            font: { size: 9, weight: 'bold' }
-          }
-        },
-        faultClearing: {
-          type: 'line',
-          xMin: faultClearingTime,
-          borderColor: 'rgba(10,112,64,0.8)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          label: {
-            display: true,
-            content: 'FAULT CLEAR',
-            position: 'start',
-            backgroundColor: 'rgba(10,112,64,0.8)',
-            color: '#fff',
-            font: { size: 9, weight: 'bold' }
-          }
-        }
-      }
-    };
-  } else {
-    timeCharts.omega.options.plugins.annotation = { annotations: {} };
-  }
+  timeCharts.omega.options.plugins.annotation = { annotations: omegaAnnotations };
 
   timeCharts.omega.update('none');
 
   // Power chart with stabilized scale
+  // T05: Semantic color coding for Pe (Pm tetap original)
+  let peColor = '#006898'; // Default: normal (biru)
+  let powerAnnotations = {};
+  if(S.sc_on && S.sc_t0 > 0){
+    const faultOnsetTime = S.sc_t0 + S.sc_delay;
+    const faultClearingTime = faultOnsetTime + S.sc_dur;
+    const currentTime = te;
+    if(currentTime >= faultOnsetTime && currentTime < faultClearingTime){
+      peColor = 'rgba(196,32,0,1)'; // During fault: merah
+    } else if(currentTime >= faultClearingTime){
+      peColor = 'rgba(10,112,64,1)'; // Post-clearing: hijau
+    }
+    // T04: Event markers
+    powerAnnotations = {
+      faultOnset: {
+        type: 'line',
+        xMin: faultOnsetTime,
+        borderColor: 'rgba(196,32,0,0.8)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: 'FAULT ON',
+          position: 'start',
+          backgroundColor: 'rgba(196,32,0,0.8)',
+          color: '#fff',
+          font: { size: 9, weight: 'bold' }
+        }
+      },
+      faultClearing: {
+        type: 'line',
+        xMin: faultClearingTime,
+        borderColor: 'rgba(10,112,64,0.8)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: 'FAULT CLEAR',
+          position: 'start',
+          backgroundColor: 'rgba(10,112,64,0.8)',
+          color: '#fff',
+          font: { size: 9, weight: 'bold' }
+        }
+      }
+    };
+  }
+
+  // T08: Zero-line emphasis for P chart
+  powerAnnotations.zeroLine = {
+    type: 'line',
+    yMin: 0,
+    yMax: 0,
+    borderColor: 'rgba(58,68,101,0.8)',
+    borderWidth: 1.5
+  };
+
   const powerScale=chartStabilizers.power.update(calcYScale([...chartData.peValues,...chartData.pmValues],0.1));
   timeCharts.power.data.datasets=[
-    {label:'Pe',data:chartData.pe,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)',fill:false,tension:0.2},
+    {label:'Pe',data:chartData.pe,borderColor:peColor,backgroundColor:'rgba(0,104,152,0.05)',fill:false,tension:0.2},
     {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false,tension:0.2}
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
   timeCharts.power.options.scales.x.min=xMin;
   timeCharts.power.options.scales.x.max=xMax;
-
-  // T04: Event markers for power chart
-  if(S.sc_on && S.sc_t0 > 0){
-    const faultOnsetTime = S.sc_t0 + S.sc_delay;
-    const faultClearingTime = faultOnsetTime + S.sc_dur;
-
-    timeCharts.power.options.plugins.annotation = {
-      annotations: {
-        faultOnset: {
-          type: 'line',
-          xMin: faultOnsetTime,
-          borderColor: 'rgba(196,32,0,0.8)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          label: {
-            display: true,
-            content: 'FAULT ON',
-            position: 'start',
-            backgroundColor: 'rgba(196,32,0,0.8)',
-            color: '#fff',
-            font: { size: 9, weight: 'bold' }
-          }
-        },
-        faultClearing: {
-          type: 'line',
-          xMin: faultClearingTime,
-          borderColor: 'rgba(10,112,64,0.8)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          label: {
-            display: true,
-            content: 'FAULT CLEAR',
-            position: 'start',
-            backgroundColor: 'rgba(10,112,64,0.8)',
-            color: '#fff',
-            font: { size: 9, weight: 'bold' }
-          }
-        }
-      }
-    };
-  } else {
-    timeCharts.power.options.plugins.annotation = { annotations: {} };
-  }
+  timeCharts.power.options.plugins.annotation = { annotations: powerAnnotations };
 
   timeCharts.power.update('none');
 
   // Frequency chart with stabilized scale
+  // T05: Semantic color coding for f
+  let fColor = '#0a7040'; // Default: normal (hijau)
+  let freqAnnotations = {};
+  if(S.sc_on && S.sc_t0 > 0){
+    const faultOnsetTime = S.sc_t0 + S.sc_delay;
+    const faultClearingTime = faultOnsetTime + S.sc_dur;
+    const currentTime = te;
+    if(currentTime >= faultOnsetTime && currentTime < faultClearingTime){
+      fColor = 'rgba(196,32,0,1)'; // During fault: merah
+    } else if(currentTime >= faultClearingTime){
+      fColor = 'rgba(10,112,64,1)'; // Post-clearing: hijau
+    }
+    // T04: Event markers
+    freqAnnotations = {
+      faultOnset: {
+        type: 'line',
+        xMin: faultOnsetTime,
+        borderColor: 'rgba(196,32,0,0.8)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: 'FAULT ON',
+          position: 'start',
+          backgroundColor: 'rgba(196,32,0,0.8)',
+          color: '#fff',
+          font: { size: 9, weight: 'bold' }
+        }
+      },
+      faultClearing: {
+        type: 'line',
+        xMin: faultClearingTime,
+        borderColor: 'rgba(10,112,64,0.8)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: 'FAULT CLEAR',
+          position: 'start',
+          backgroundColor: 'rgba(10,112,64,0.8)',
+          color: '#fff',
+          font: { size: 9, weight: 'bold' }
+        }
+      }
+    };
+  }
+
   const fScale=chartStabilizers.freq.update(calcYScale(chartData.fValues,0.05));
   timeCharts.freq.data.datasets=[
-    {label:'f',data:chartData.f,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)',fill:false,tension:0.2},
+    {label:'f',data:chartData.f,borderColor:fColor,backgroundColor:'rgba(10,112,64,0.05)',fill:false,tension:0.2},
     {label:'fnom',data:chartData.fnom,borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1,fill:false}
   ];
   timeCharts.freq.options.scales.y.min=fScale.min;
   timeCharts.freq.options.scales.y.max=fScale.max;
   timeCharts.freq.options.scales.x.min=xMin;
   timeCharts.freq.options.scales.x.max=xMax;
-
-  // T04: Event markers for frequency chart
-  if(S.sc_on && S.sc_t0 > 0){
-    const faultOnsetTime = S.sc_t0 + S.sc_delay;
-    const faultClearingTime = faultOnsetTime + S.sc_dur;
-
-    timeCharts.freq.options.plugins.annotation = {
-      annotations: {
-        faultOnset: {
-          type: 'line',
-          xMin: faultOnsetTime,
-          borderColor: 'rgba(196,32,0,0.8)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          label: {
-            display: true,
-            content: 'FAULT ON',
-            position: 'start',
-            backgroundColor: 'rgba(196,32,0,0.8)',
-            color: '#fff',
-            font: { size: 9, weight: 'bold' }
-          }
-        },
-        faultClearing: {
-          type: 'line',
-          xMin: faultClearingTime,
-          borderColor: 'rgba(10,112,64,0.8)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          label: {
-            display: true,
-            content: 'FAULT CLEAR',
-            position: 'start',
-            backgroundColor: 'rgba(10,112,64,0.8)',
-            color: '#fff',
-            font: { size: 9, weight: 'bold' }
-          }
-        }
-      }
-    };
-  } else {
-    timeCharts.freq.options.plugins.annotation = { annotations: {} };
-  }
+  timeCharts.freq.options.plugins.annotation = { annotations: freqAnnotations };
 
   timeCharts.freq.update('none');
 }
