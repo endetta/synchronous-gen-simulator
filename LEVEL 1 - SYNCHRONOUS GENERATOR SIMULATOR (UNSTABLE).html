@@ -675,6 +675,30 @@ function mkSvg(tag,attrs,txt){
   return el;
 }
 
+// Safe element access helpers to prevent null errors
+function safeQuerySelector(svg, selector) {
+  if (!svg) return null;
+  try {
+    return svg.querySelector(selector);
+  } catch(e) {
+    console.warn('querySelector failed for:', selector, e);
+    return null;
+  }
+}
+
+function safeSetAttr(element, attrs) {
+  if (!element || !attrs) return false;
+  try {
+    for (const [k, v] of Object.entries(attrs)) {
+      element.setAttribute(k, v);
+    }
+    return true;
+  } catch(e) {
+    console.warn('setAttribute failed:', e);
+    return false;
+  }
+}
+
 function initSvgPhasor(svg){
   svg.innerHTML='';
   // Background gradient
@@ -812,90 +836,151 @@ function updateSvgPhasor(){
   const f2=v=>v.toFixed(1);
 
   // Background rect
-  svg.querySelector('#ph-bgrect').setAttribute('x','0');
-  svg.querySelector('#ph-bgrect').setAttribute('y','0');
-  svg.querySelector('#ph-bgrect').setAttribute('width',w);
-  svg.querySelector('#ph-bgrect').setAttribute('height',h);
+  const bgRect = safeQuerySelector(svg, '#ph-bgrect');
+  if (bgRect) {
+    bgRect.setAttribute('x', '0');
+    bgRect.setAttribute('y', '0');
+    bgRect.setAttribute('width', w);
+    bgRect.setAttribute('height', h);
+  }
 
   // Rings
   const rings=[{id:'ph-ring1',f:0.25,s:'#edf0f8',sw:'0.7'},{id:'ph-ring2',f:0.5,s:'#dde2ec',sw:'0.7'},
                {id:'ph-ring3',f:0.75,s:'#dde2ec',sw:'0.8'},{id:'ph-ring4',f:1.0,s:'#b8c0d4',sw:'1.6'}];
   rings.forEach(r=>{
-    const el=svg.querySelector('#'+r.id);
-    el.setAttribute('cx',f2(cx)); el.setAttribute('cy',f2(cy));
-    el.setAttribute('r',f2(R*r.f)); el.setAttribute('stroke',r.s); el.setAttribute('stroke-width',r.sw);
+    const el=safeQuerySelector(svg, '#'+r.id);
+    if (el) {
+      el.setAttribute('cx', f2(cx));
+      el.setAttribute('cy', f2(cy));
+      el.setAttribute('r', f2(R*r.f));
+      el.setAttribute('stroke', r.s);
+      el.setAttribute('stroke-width', r.sw);
+    }
   });
   // Bezel
-  const bv=svg.querySelector('#ph-bezel');
-  bv.setAttribute('cx',f2(cx)); bv.setAttribute('cy',f2(cy)); bv.setAttribute('r',f2(R+5));
+  const bv = safeQuerySelector(svg, '#ph-bezel');
+  if (bv) {
+    bv.setAttribute('cx', f2(cx));
+    bv.setAttribute('cy', f2(cy));
+    bv.setAttribute('r', f2(R+5));
+  }
 
   // Ticks (rebuild if size changed)
-  if(Math.abs(w-ph_lastW)<3&&Math.abs(h-ph_lastH)<3&&svg.querySelector('#ph-ticks').children.length===0){
-    buildTicks(svg,cx,cy,R);
-  } else if(phasorReady&&svg.querySelector('#ph-ticks').children.length===0){
-    buildTicks(svg,cx,cy,R);
+  const phTicks = safeQuerySelector(svg, '#ph-ticks');
+  if (phTicks) {
+    if (Math.abs(w-ph_lastW)<3 && Math.abs(h-ph_lastH)<3 && phTicks.children.length===0) {
+      buildTicks(svg, cx, cy, R);
+    } else if (phasorReady && phTicks.children.length===0) {
+      buildTicks(svg, cx, cy, R);
+    }
   }
 
   // Cross-hairs
-  const xh=svg.querySelector('#ph-xh'),xv=svg.querySelector('#ph-xv');
-  xh.setAttribute('x1',f2(cx-R)); xh.setAttribute('y1',f2(cy)); xh.setAttribute('x2',f2(cx+R)); xh.setAttribute('y2',f2(cy));
-  xv.setAttribute('x1',f2(cx)); xv.setAttribute('y1',f2(cy-R)); xv.setAttribute('x2',f2(cx)); xv.setAttribute('y2',f2(cy+R));
+  const xh = safeQuerySelector(svg, '#ph-xh');
+  const xv = safeQuerySelector(svg, '#ph-xv');
+  if (xh) {
+    xh.setAttribute('x1', f2(cx-R));
+    xh.setAttribute('y1', f2(cy));
+    xh.setAttribute('x2', f2(cx+R));
+    xh.setAttribute('y2', f2(cy));
+  }
+  if (xv) {
+    xv.setAttribute('x1', f2(cx));
+    xv.setAttribute('y1', f2(cy-R));
+    xv.setAttribute('x2', f2(cx));
+    xv.setAttribute('y2', f2(cy+R));
+  }
 
   // Angles
   const base=S.anim-Math.PI/2;
   const vt_a=base, ef_a=base+S.delta;
 
   // Delta arc
+  const arcEl = safeQuerySelector(svg, '#ph-arc');
   if(Math.abs(S.delta)>0.03){
     const arcR=R*0.37;
     const aMin=Math.min(vt_a,ef_a), aMax=Math.max(vt_a,ef_a);
     const x1=cx+arcR*Math.cos(aMin), y1=cy+arcR*Math.sin(aMin);
     const x2=cx+arcR*Math.cos(aMax), y2=cy+arcR*Math.sin(aMax);
     const lg=Math.abs(S.delta)>Math.PI?1:0;
-    const arcEl=svg.querySelector('#ph-arc');
-    arcEl.setAttribute('d',`M${f2(cx)},${f2(cy)} L${f2(x1)},${f2(y1)} A${f2(arcR)},${f2(arcR)} 0 ${lg},1 ${f2(x2)},${f2(y2)} Z`);
-    arcEl.setAttribute('visibility','visible');
-  }else{svg.querySelector('#ph-arc').setAttribute('visibility','hidden');}
+    if (arcEl) {
+      arcEl.setAttribute('d',`M${f2(cx)},${f2(cy)} L${f2(x1)},${f2(y1)} A${f2(arcR)},${f2(arcR)} 0 ${lg},1 ${f2(x2)},${f2(y2)} Z`);
+      arcEl.setAttribute('visibility','visible');
+    }
+  } else {
+    if (arcEl) arcEl.setAttribute('visibility','hidden');
+  }
 
   // Vt arrow
   const vtLen=R*0.80, sz=12;
   const vtX=cx+vtLen*Math.cos(vt_a), vtY=cy+vtLen*Math.sin(vt_a);
   const vtA=makeSvgArrow(null,cx,cy,vtX,vtY,sz);
-  const vtL=svg.querySelector('#ph-vt');
-  vtL.setAttribute('x1',f2(cx)); vtL.setAttribute('y1',f2(cy));
-  vtL.setAttribute('x2',vtA.lx2); vtL.setAttribute('y2',vtA.ly2);
-  svg.querySelector('#ph-vt-h').setAttribute('points',vtA.poly);
-  const vtLbl=svg.querySelector('#ph-vt-l');
-  vtLbl.setAttribute('x',f2(cx+R*1.04*Math.cos(vt_a))); vtLbl.setAttribute('y',f2(cy+R*1.04*Math.sin(vt_a)));
+  const vtL = safeQuerySelector(svg, '#ph-vt');
+  const vtH = safeQuerySelector(svg, '#ph-vt-h');
+  const vtLbl = safeQuerySelector(svg, '#ph-vt-l');
+  if (vtL) {
+    vtL.setAttribute('x1', f2(cx));
+    vtL.setAttribute('y1', f2(cy));
+    vtL.setAttribute('x2', vtA.lx2);
+    vtL.setAttribute('y2', vtA.ly2);
+  }
+  if (vtH) vtH.setAttribute('points', vtA.poly);
+  if (vtLbl) {
+    vtLbl.setAttribute('x', f2(cx+R*1.04*Math.cos(vt_a)));
+    vtLbl.setAttribute('y', f2(cy+R*1.04*Math.sin(vt_a)));
+  }
 
   // Ef arrow
   const efX=cx+vtLen*Math.cos(ef_a), efY=cy+vtLen*Math.sin(ef_a);
   const efC=S.sc_active?'#c42000':'#b85800';
   const efA=makeSvgArrow(null,cx,cy,efX,efY,sz);
-  const efL=svg.querySelector('#ph-ef');
-  efL.setAttribute('x1',f2(cx)); efL.setAttribute('y1',f2(cy));
-  efL.setAttribute('x2',efA.lx2); efL.setAttribute('y2',efA.ly2); efL.setAttribute('stroke',efC);
-  svg.querySelector('#ph-ef-h').setAttribute('points',efA.poly); svg.querySelector('#ph-ef-h').setAttribute('fill',efC);
-  const efLbl=svg.querySelector('#ph-ef-l');
-  efLbl.setAttribute('x',f2(cx+R*1.04*Math.cos(ef_a))); efLbl.setAttribute('y',f2(cy+R*1.04*Math.sin(ef_a)));
-  efLbl.setAttribute('fill',efC);
+  const efL = safeQuerySelector(svg, '#ph-ef');
+  const efH = safeQuerySelector(svg, '#ph-ef-h');
+  const efLbl = safeQuerySelector(svg, '#ph-ef-l');
+  if (efL) {
+    efL.setAttribute('x1', f2(cx));
+    efL.setAttribute('y1', f2(cy));
+    efL.setAttribute('x2', efA.lx2);
+    efL.setAttribute('y2', efA.ly2);
+    efL.setAttribute('stroke', efC);
+  }
+  if (efH) {
+    efH.setAttribute('points', efA.poly);
+    efH.setAttribute('fill', efC);
+  }
+  if (efLbl) {
+    efLbl.setAttribute('x', f2(cx+R*1.04*Math.cos(ef_a)));
+    efLbl.setAttribute('y', f2(cy+R*1.04*Math.sin(ef_a)));
+    efLbl.setAttribute('fill', efC);
+  }
 
   // Delta label in arc
+  const dl = safeQuerySelector(svg, '#ph-dlbl');
   if(Math.abs(S.delta)>0.06){
     const mid=base+S.delta/2, lr=R*0.53;
-    const dl=svg.querySelector('#ph-dlbl');
-    dl.setAttribute('x',f2(cx+lr*Math.cos(mid))); dl.setAttribute('y',f2(cy+lr*Math.sin(mid)));
-    dl.textContent='δ='+(S.delta*R2D).toFixed(1)+'°';
-    dl.setAttribute('visibility','visible');
-  }else{svg.querySelector('#ph-dlbl').setAttribute('visibility','hidden');}
+    if (dl) {
+      dl.setAttribute('x', f2(cx+lr*Math.cos(mid)));
+      dl.setAttribute('y', f2(cy+lr*Math.sin(mid)));
+      dl.textContent='δ='+(S.delta*R2D).toFixed(1)+'°';
+      dl.setAttribute('visibility','visible');
+    }
+  } else {
+    if (dl) dl.setAttribute('visibility','hidden');
+  }
 
   // Center dot
-  const ctr=svg.querySelector('#ph-ctr');
-  ctr.setAttribute('cx',f2(cx)); ctr.setAttribute('cy',f2(cy));
+  const ctr = safeQuerySelector(svg, '#ph-ctr');
+  if (ctr) {
+    ctr.setAttribute('cx', f2(cx));
+    ctr.setAttribute('cy', f2(cy));
+  }
 
   // Caption
-  const cap=svg.querySelector('#ph-cap');
-  cap.setAttribute('x',f2(cx)); cap.setAttribute('y',f2(h-3));
+  const cap = safeQuerySelector(svg, '#ph-cap');
+  if (cap) {
+    cap.setAttribute('x', f2(cx));
+    cap.setAttribute('y', f2(h-3));
+  }
 
   // Data panels
   const Pmax=S.Ef*S.V/S.Xs, Pe=getPe(S);
@@ -1064,32 +1149,32 @@ function updateSvgPhasorRealistic(svg){
   const rotorAng=base+S.delta;
 
   // Update pole positions
-  const poleN=svg.querySelector('#pole-N');
-  const poleS=svg.querySelector('#pole-S');
+  const poleN = safeQuerySelector(svg, '#pole-N');
+  const poleS = safeQuerySelector(svg, '#pole-S');
   if(poleN){
-    poleN.setAttribute('x',cx+rotorR*0.55*Math.cos(rotorAng));
-    poleN.setAttribute('y',cy+rotorR*0.55*Math.sin(rotorAng));
+    poleN.setAttribute('x', cx+rotorR*0.55*Math.cos(rotorAng));
+    poleN.setAttribute('y', cy+rotorR*0.55*Math.sin(rotorAng));
   }
   if(poleS){
-    poleS.setAttribute('x',cx+rotorR*0.55*Math.cos(rotorAng+Math.PI));
-    poleS.setAttribute('y',cy+rotorR*0.55*Math.sin(rotorAng+Math.PI));
+    poleS.setAttribute('x', cx+rotorR*0.55*Math.cos(rotorAng+Math.PI));
+    poleS.setAttribute('y', cy+rotorR*0.55*Math.sin(rotorAng+Math.PI));
   }
 
   // Update rotor field intensity based on Ef
-  const rotorField=svg.querySelector('#rotor-field');
+  const rotorField = safeQuerySelector(svg, '#rotor-field');
   if(rotorField){
     const efNorm=Math.min(S.Ef/3,1);
-    rotorField.setAttribute('opacity',0.3+efNorm*0.5);
+    rotorField.setAttribute('opacity', 0.3+efNorm*0.5);
     // Scale field radius with excitation
     const fieldR=rotorR*(0.6+efNorm*0.3);
-    rotorField.setAttribute('r',fieldR);
+    rotorField.setAttribute('r', fieldR);
   }
 
   // Update stator rotating field (rotates at sync speed)
-  const statorField=svg.querySelector('#stator-field');
+  const statorField = safeQuerySelector(svg, '#stator-field');
   if(statorField){
     const syncAng=base; // Stator field rotates at sync speed
-    statorField.setAttribute('opacity',0.4+0.2*Math.sin(Date.now()/200));
+    statorField.setAttribute('opacity', 0.4+0.2*Math.sin(Date.now()/200));
   }
 
   // Update stator winding colors based on current phase
@@ -1100,10 +1185,10 @@ function updateSvgPhasorRealistic(svg){
     const phaseAng=base+pi*2*Math.PI/3;
     const intensity=0.5+0.5*Math.sin(time*10+pi*2*Math.PI/3); // Pulsing effect
     for(let i=0;i<6;i++){
-      const coil=svg.querySelector(`#winding-${ph}-${i}`);
+      const coil = safeQuerySelector(svg, `#winding-${ph}-${i}`);
       if(coil){
         const baseColor=phaseColors[pi];
-        coil.setAttribute('opacity',0.4+intensity*0.6);
+        coil.setAttribute('opacity', 0.4+intensity*0.6);
       }
     }
   });
@@ -1790,7 +1875,15 @@ function loop(ts){
     renderAll();
     requestAnimationFrame(loop);
   }catch(err){
-    console.error('Animation loop error:',err);
+    console.error('Animation loop error:', err);
+    console.error('Stack trace:', err.stack);
+    console.error('Current state:', {
+      animMode: S?.animMode,
+      phasorReady,
+      realInit,
+      delta: S?.delta,
+      omega: S?.omega
+    });
     showFatalError('Fatal error in animation loop.<br><br>'+err.message+'<br><small>Reload simulator to restart.</small>');
   }
 }
@@ -1807,6 +1900,13 @@ function setMode(m){
 }
 function setAnimMode(mode){
   if(!S) return;
+  // Guard: ensure SVG is initialized before switching modes
+  const svg = document.getElementById('svgPhasor');
+  if(!svg) return;
+
+  // Mark as not ready during mode switch to prevent race conditions
+  phasorReady = false;
+
   S.animMode=mode;
   document.getElementById('amode-phasor').classList.toggle('active',mode==='phasor');
   document.getElementById('amode-realistic').classList.toggle('active',mode==='realistic');
