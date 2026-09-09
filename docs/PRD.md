@@ -2,7 +2,7 @@
 
 **Product Requirements Document**
 Version: 0.1.0-unstable
-Last Updated: 2026-09-08
+Last Updated: 2026-09-09
 
 ---
 
@@ -200,13 +200,32 @@ Stabilitas: `A₂ ≥ A₁` → STABIL
 - **Physics step:** 3 ms (PHDT = 0.003 s)
 - **History window:** 30 detik
 
-### 5.2 Compatibility
+### 5.2 Dependencies
+
+**External Libraries (CDN with SRI):**
+
+| Library | Version | Purpose | License |
+|---------|---------|---------|---------|
+| Chart.js | 4.4.1 | Time series visualization (δ, ω, f, P) | MIT |
+| chartjs-plugin-annotation | 3.3.0 | EAC area annotations on charts | MIT |
+| chartjs-plugin-zoom | 2.0.1 | Chart pan/zoom for detailed analysis | MIT |
+
+**CDN URLs with SRI:**
+```html
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-bYKsxjqxaylGfcsbR8gpRpA4n3bKucz/Z7MqapB0Io/RiuxGVJ+808uklxP0CwN2" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha384-zPzbVRXfR492Sd5D+HydTYCxxgHAfgVO8KERbLlpeH5unsmbAEXrscGUUqLZG9BM" crossorigin="anonymous"></script>
+```
+
+**Note:** SRI hashes ensure CDN integrity. Verify at https://www.srihash.org/
+
+### 5.3 Browser Compatibility
 
 - **Browser:** Chrome 90+, Firefox 88+, Edge 90+
 - **Resolution:** Minimum 1280×720
-- **No dependencies:** HTML self-contained
+- **Core functionality:** Works offline after initial CDN load (browser cache)
 
-### 5.3 Accuracy
+### 5.4 Accuracy
 
 - **ODE solver:** RK4 (Runge-Kutta 4th order)
 - **Numerical precision:** IEEE 754 double
@@ -229,4 +248,5 @@ Stabilitas: `A₂ ≥ A₁` → STABIL
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.1.0-unstable | 2026-09-09 | Added §5.2 Dependencies (Chart.js + plugins with SRI) |
 | 0.1.0-unstable | 2026-09-08 | Initial PRD draft |

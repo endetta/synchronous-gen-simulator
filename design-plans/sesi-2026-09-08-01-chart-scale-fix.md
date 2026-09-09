@@ -100,10 +100,23 @@ t=120s: window=[90-120], data=3000 points
 
 ## Langkah Berikutnya
 
-Tidak ada task pending. Simulator siap untuk:
+Simulator siap untuk:
 1. Testing manual di browser
 2. Feature baru jika diperlukan
 3. Stabilisasi lanjutan
+
+---
+
+### 4. Chart Axis Label Overlapping Fix (Selesai)
+
+**Masalah:** Label "Time (s)" di sumbu X bertumpuk dengan angka tick values, membuat tampilan tidak terbaca.
+
+**Solusi:**
+- Tambah padding ke X-axis tick labels (8px) dan title (10px)
+- Tambah padding ke Y-axis tick labels (6px)
+- Kurangi ukuran font tick dari 10px ke 9px untuk spacing yang lebih baik
+
+**Commit:** bbb094c
 
 ---
 

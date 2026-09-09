@@ -1,0 +1,336 @@
+{
+  "timestamp": "2026-09-09T03:44:24.330Z",
+  "totalScenarios": 10,
+  "passed": 10,
+  "failed": 0,
+  "scenarios": [
+    {
+      "name": "01-load-response-toggle",
+      "description": "Test Load Response button toggle",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "screenshot",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 4,
+          "action": "screenshot",
+          "status": "passed"
+        },
+        {
+          "step": 5,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 6,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 7,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "01-load-response-toggle-initial-state.png",
+        "01-load-response-toggle-rlr-clicked.png",
+        "01-load-response-toggle-rlr-toggle-off.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "02-animation-mode-fasor",
+      "description": "Test Fasor animation mode",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "02-animation-mode-fasor-fasor-mode.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "03-animation-mode-realistis",
+      "description": "Test Realistis animation mode",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "03-animation-mode-realistis-realistis-mode.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "04-parameter-h-slider",
+      "description": "Test H (Inertia) slider change",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "evaluate",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "04-parameter-h-slider-h-changed-5-5.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "05-parameter-pm-input",
+      "description": "Test Pm (Mechanical Power) input change",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "type",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "05-parameter-pm-input-pm-changed-1-2.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "06-mode-island",
+      "description": "Test Island mode switching",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "06-mode-island-island-mode.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "07-mode-grid",
+      "description": "Test Grid mode switching",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "07-mode-grid-grid-mode.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "08-rlr-simulation",
+      "description": "Test full RLR simulation start/stop",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        },
+        {
+          "step": 4,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 5,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 6,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "08-rlr-simulation-rlr-running.png",
+        "08-rlr-simulation-rlr-stopped.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "09-pane-toggle",
+      "description": "Test pane visibility toggle",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        },
+        {
+          "step": 4,
+          "action": "click",
+          "status": "passed"
+        },
+        {
+          "step": 5,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 6,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "09-pane-toggle-pane1-hidden.png",
+        "09-pane-toggle-pane1-visible.png"
+      ],
+      "errors": []
+    },
+    {
+      "name": "10-multiple-params",
+      "description": "Test multiple parameter changes",
+      "passed": true,
+      "steps": [
+        {
+          "step": 1,
+          "action": "evaluate",
+          "status": "passed"
+        },
+        {
+          "step": 2,
+          "action": "wait",
+          "status": "passed"
+        },
+        {
+          "step": 3,
+          "action": "screenshot",
+          "status": "passed"
+        }
+      ],
+      "screenshots": [
+        "10-multiple-params-all-params-changed.png"
+      ],
+      "errors": []
+    }
+  ],
+  "consoleErrors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 ()",
+      "location": {
+        "url": "https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js"
+      }
+    },
+    {
+      "text": "Refused to execute script from 'https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js' because its MIME type ('text/plain') is not executable, and strict MIME type checking is enabled.",
+      "location": {
+        "url": "file:///C:/Users/pcelr/Documents/Sheva/SHEVA'S%20SIMULATOR%20LIBRARY/LEVEL%201%20-%20SYNCHRONOUS%20GEN%20(UNSTABLE)/LEVEL%201%20-%20SYNCHRONOUS%20GENERATOR%20SIMULATOR%20(UNSTABLE).html"
+      }
+    }
+  ]
+}

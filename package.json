@@ -1,0 +1,32 @@
+{
+  "name": "synchronous-gen-simulator",
+  "version": "1.0.0",
+  "description": "Synchronous Generator Simulator for power system stability studies",
+  "main": "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "test": "node tools/model.test.js && node tools/ui.test.js && node tools/chart-scale.test.js",
+    "test:console": "echo 'Copy tools/console-test-runner.js to browser console'",
+    "test:puppeteer": "node tools/puppeteer-test-runner.js",
+    "test:all": "npm run test && npm run test:puppeteer"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/endetta/synchronous-gen-simulator.git"
+  },
+  "keywords": [
+    "power-system",
+    "generator-simulator",
+    "transient-stability",
+    "swing-equation"
+  ],
+  "author": "Sheva's Simulator Library Team",
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer": "^23.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/endetta/synchronous-gen-simulator/issues"
+  },
+  "homepage": "https://github.com/endetta/synchronous-gen-simulator#readme"
+}

@@ -8,10 +8,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Chart.js for Time Series -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<!-- Chart.js for Time Series (with SRI for security) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-bYKsxjqxaylGfcsbR8gpRpA4n3bKucz/Z7MqapB0Io/RiuxGVJ+808uklxP0CwN2" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha384-zPzbVRXfR492Sd5D+HydTYCxxgHAfgVO8KERbLlpeH5unsmbAEXrscGUUqLZG9BM" crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -54,13 +54,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .ptlbl{font-family:var(--serif);font-size:9px;color:var(--dim2);letter-spacing:1px;text-transform:uppercase}
 .ptbtn{padding:2px 10px;border:1px solid var(--brd2);border-radius:3px;font-family:var(--serif);font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);background:var(--surf);cursor:pointer;transition:all .15s}
 .ptbtn.on{background:var(--etap);border-color:var(--etap);color:#fff}
-.viz-scroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;will-change:scroll-position;overscroll-behavior:contain;scroll-behavior:auto;position:relative;contain:layout style}
+.viz-scroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--brd2) transparent;will-change:scroll-position;overscroll-behavior:contain;scroll-behavior:auto;position:relative;contain:layout style;overflow-anchor:none}
 .viz-scroll::-webkit-scrollbar{width:4px}
 .viz-scroll::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
 .vpane{position:relative;overflow:hidden;background:var(--surf);border-bottom:1px solid var(--brd);contain:layout style}
 .vpane:last-child{border-bottom:none}
 .vlabel{position:absolute;top:6px;left:10px;z-index:5;pointer-events:none;font-family:var(--serif);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--dim);background:rgba(255,255,255,.85);padding-right:4px}
-.vpane>svg,.vpane>canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%}
+.vpane>svg,.vpane>canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .drag-handle{position:absolute;bottom:0;left:0;right:0;height:7px;cursor:ns-resize;background:linear-gradient(to bottom,transparent,rgba(184,192,212,.45));z-index:10}
 .drag-handle:hover{background:linear-gradient(to bottom,transparent,rgba(196,32,0,.2))}
 .drag-handle::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:32px;height:2px;border-radius:2px;background:rgba(160,170,192,.6)}
@@ -134,6 +134,10 @@ input[type=number]:focus{border-color:var(--etap)}
 .tip-row{font-family:var(--body);font-size:13px;color:var(--txt2);margin-bottom:4px;line-height:1.55}
 .tip-row strong{color:var(--txt);font-weight:600}
 .tip-effect{font-family:var(--body);font-size:12.5px;font-style:italic;color:var(--green);margin-top:7px;padding-top:7px;border-top:1px solid var(--brd);line-height:1.6}
+.anim-mode-toggle{position:absolute;top:6px;right:10px;z-index:10;display:flex;gap:4px}
+.amode-btn{padding:3px 8px;border:1px solid var(--brd2);border-radius:3px;font-family:var(--serif);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);background:var(--surf);cursor:pointer;transition:all .15s}
+.amode-btn:hover{background:var(--surf2)}
+.amode-btn.active{background:var(--etap);border-color:var(--etap);color:#fff}
 </style>
 </head>
 <body>
@@ -173,6 +177,10 @@ input[type=number]:focus{border-color:var(--etap)}
       <!-- Panel 1: SVG Phasor -->
       <div class="vpane" id="pane1" style="height:320px">
         <div class="vlabel">I · Rotor–Stator Phasor Animation</div>
+        <div class="anim-mode-toggle">
+          <button class="amode-btn active" id="amode-phasor" onclick="setAnimMode('phasor')">Fasor</button>
+          <button class="amode-btn" id="amode-realistic" onclick="setAnimMode('realistic')">Realistis</button>
+        </div>
         <svg id="svgPhasor" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"></svg>
         <div class="drag-handle" data-pane="pane1"></div>
       </div>
@@ -313,7 +321,7 @@ input[type=number]:focus{border-color:var(--etap)}
 // CONSTANTS  (Kundur 1994 notation)
 // ================================================================
 const F0=50, WS=2*Math.PI*50, R2D=180/Math.PI, D2R=Math.PI/180;
-const PHDT=0.003, HSTEP=0.04, HWIN=30;
+const PHDT=0.003, HSTEP=0.016, HWIN=30; // HSTEP = 16ms (60 Hz) untuk smooth chart
 const VSPD=2*Math.PI/7; // visual phasor 1rev/7s
 const NS='http://www.w3.org/2000/svg';
 
@@ -392,16 +400,57 @@ function getRLRPeriod(t){
 }
 
 // ================================================================
+// INPUT VALIDATION & ERROR HANDLING
+// ================================================================
+function parseValidNumber(value, defaultVal, min, max, label){
+  const parsed=parseFloat(value);
+  if(isNaN(parsed)){
+    console.warn('Invalid input for '+label+': "'+value+'", using default '+defaultVal);
+    showInputWarning('Input tidak valid untuk '+label+'. Menggunakan: '+defaultVal);
+    return defaultVal;
+  }
+  const clamped=Math.max(min,Math.min(max,parsed));
+  if(clamped!==parsed) console.warn(label+' clamped from '+parsed+' to '+clamped);
+  return clamped;
+}
+
+function showInputWarning(text){
+  // Remove existing warning if any
+  let warn=document.getElementById('input-warning');
+  if(!warn){
+    warn=document.createElement('div');
+    warn.id='input-warning';
+    warn.style.cssText='display:none;position:fixed;top:70px;right:20px;background:#ff6b35;color:#fff;padding:12px;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:9000;';
+    warn.innerHTML='<span id="warning-text"></span><button onclick="document.getElementById(\'input-warning\').style.display=\'none\'" style="margin-left:12px;background:rgba(255,255,255,0.3);border:none;color:#fff;padding:4px 8px;cursor:pointer;">✕</button>';
+    document.body.appendChild(warn);
+  }
+  document.getElementById('warning-text').textContent=text;
+  warn.style.display='block';
+}
+
+function showFatalError(message){
+  // Remove existing overlay if any
+  let overlay=document.getElementById('fatal-error-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='fatal-error-overlay';
+    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(196,32,0,0.95);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:10000;font-family:var(--serif);';
+  }
+  overlay.innerHTML='<div style="font-size:24px;font-weight:700;margin-bottom:16px;">⚠ SIMULATOR ERROR</div><div style="font-size:16px;margin-bottom:24px;">'+message+'</div><button onclick="location.reload()" style="padding:12px 24px;background:#fff;color:var(--etap);border:none;border-radius:4px;font-size:14px;font-weight:700;cursor:pointer;">RELOAD SIMULATOR</button>';
+  document.body.appendChild(overlay);
+}
+
+// ================================================================
 // PHYSICS STATE  (Kundur 1994)
 // ================================================================
 let S=null, lastRAF=null;
 
 function makeState(){
-  const H  = parseFloat(document.getElementById('sH').value)  || 8.0;
-  const D  = parseFloat(document.getElementById('sD').value)  || 4.0;
-  const Xs = parseFloat(document.getElementById('sXs').value) || 1.2;
-  const Ef = parseFloat(document.getElementById('sEf').value) || 1.5;
-  const Pm = parseFloat(document.getElementById('sPm').value) || 0.8;
+  const H  = parseValidNumber(document.getElementById('sH').value, 8.0, 1, 15, 'Inertia H');
+  const D  = parseValidNumber(document.getElementById('sD').value, 4.0, 0, 15, 'Damping D');
+  const Xs = parseValidNumber(document.getElementById('sXs').value, 1.2, 0.05, 3, 'Reactance Xs');
+  const Ef = parseValidNumber(document.getElementById('sEf').value, 1.5, 0.1, 3, 'Excitation Ef');
+  const Pm = parseValidNumber(document.getElementById('sPm').value, 0.8, 0.01, 3, 'Mechanical Power Pm');
   const V=1.0, Pmax=Ef*V/Xs;
   const d0=Math.asin(Math.min(Math.max(Pm/Pmax,-0.9999),0.9999));
   return{
@@ -415,6 +464,7 @@ function makeState(){
     particles:[], part_t:0,
     narr:'Sistem PLTU setimbang.', evts:[], ev_t0:0, _scnarr:false,
     _rlr_last_phase:'',
+    animMode:'phasor', // 'phasor' | 'realistic'
   };
 }
 
@@ -422,11 +472,15 @@ function makeState(){
 // PHYSICS ENGINE  (swing equation + TGOV1 governor)
 // Ref: Kundur (1994) §11.1; Anderson & Fouad (2003) §2.4
 // ================================================================
-function getPmax(s){ return s.sc_active ? s.Ef*s.V/s.Xs*s.sc_Pfact : s.Ef*s.V/s.Xs; }
+function getPmax(s){
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  return s.sc_active ? s.Ef*s.V/Xs_safe*s.sc_Pfact : s.Ef*s.V/Xs_safe;
+}
 function getPe(s)  { return getPmax(s)*Math.sin(s.delta); }
 
 function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
-  const Pmax=s.Ef*s.V/s.Xs;
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  const Pmax=s.Ef*s.V/Xs_safe;
   const Pm=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
   const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
   const c=Pm*(Math.PI-2*d0)/Pmax-Math.cos(d0);
@@ -435,7 +489,8 @@ function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
 }
 function getCCT(s){ // Critical clearing time (Kundur eq.11.17; Pe_fault≈0)
   const dcc=getCC(s); if(!dcc) return null;
-  const Pmax=s.Ef*s.V/s.Xs;
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  const Pmax=s.Ef*s.V/Xs_safe;
   const Pm=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
   const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
   if(Pm<=0) return null;
@@ -453,7 +508,7 @@ function ode(s, delta, omega, Xg, Pm_gov){
   // TGOV1 Steam Governor: T1=0.5s (servo), T2=3.5s (steam chest+reheater) IEEE Std 421.5
   const T1=0.5, T2=3.5, R=0.05;
   const gov=(s.mode==='island'||rlr_running);
-  const d_Xg    = gov?(1/T1)*(-omega/R-Xg):-Xg/0.05;
+  const d_Xg    = gov?(1/T1)*(s.Pm-omega/R-Xg):-Xg/0.05;
   const d_Pmgov =(1/T2)*(Xg-Pm_gov);
   return[d_delta,d_omega,d_Xg,d_Pmgov,Pe,Pm_eff];
 }
@@ -503,13 +558,18 @@ function stepPhys(s,rdt){
     rk4(s,dt);
     procEvts(s);
   }
-  // History record
+  // History record with bounded array (prevent memory leak)
+  function pushHistory(hist, entry, maxLen){
+    hist.push(entry);
+    while(hist.length>maxLen) hist.shift();
+  }
+
   if(s.t-s.hlast>=HSTEP){
     const Pe=getPe(s);
     const Pm_eff=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
-    const f=s.mode==='grid'?F0*(1+s.omega*0.05):F0*(1+s.omega);
-    s.hist.push({t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active});
-    if(s.hist.length>900)s.hist.shift();
+    const f=s.mode==='grid'?F0:F0*(1+s.omega);
+    // Keep 30 seconds of history at 60 Hz = 1800 points (was 900 at 25 Hz)
+    pushHistory(s.hist,{t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active},1800);
     s.hlast=s.t;
     autoNarr(s); updateCards(s);
     if(rlr_running)updateRLRDisplay(s);
@@ -596,7 +656,7 @@ function updateCards(s){
 }
 function updateHdr(){
   const Pe=getPe(S),Pm_eff=Math.min(Math.max(S.Pm+S.Pm_gov,0),3.5);
-  const f=S.mode==='grid'?F0*(1+S.omega*0.05):F0*(1+S.omega);
+  const f=S.mode==='grid'?F0:F0*(1+S.omega);
   document.getElementById('hd').textContent=(S.delta*R2D).toFixed(2)+'°';
   document.getElementById('hw').textContent=S.omega.toFixed(6)+' pu';
   document.getElementById('hf').textContent=f.toFixed(4)+' Hz';
@@ -614,6 +674,30 @@ function mkSvg(tag,attrs,txt){
   for(const[k,v] of Object.entries(attrs||{})) el.setAttribute(k,v);
   if(txt!==undefined) el.textContent=txt;
   return el;
+}
+
+// Safe element access helpers to prevent null errors
+function safeQuerySelector(svg, selector) {
+  if (!svg) return null;
+  try {
+    return svg.querySelector(selector);
+  } catch(e) {
+    console.warn('querySelector failed for:', selector, e);
+    return null;
+  }
+}
+
+function safeSetAttr(element, attrs) {
+  if (!element || !attrs) return false;
+  try {
+    for (const [k, v] of Object.entries(attrs)) {
+      element.setAttribute(k, v);
+    }
+    return true;
+  } catch(e) {
+    console.warn('setAttribute failed:', e);
+    return false;
+  }
 }
 
 function initSvgPhasor(svg){
@@ -682,24 +766,42 @@ function makeSvgArrow(ctx, sx, sy, ex, ey, sz){
   return{lx2:bx.toFixed(1),ly2:by.toFixed(1),poly:`${ex.toFixed(1)},${ey.toFixed(1)} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${p2x.toFixed(1)},${p2y.toFixed(1)}`};
 }
 
-function drawDataPanel(g, data, px, py, panW, rowH){
+// Cache for data panel elements to avoid innerHTML reflow
+let dpLeftCache=null, dpRightCache=null;
+function drawDataPanel(g, data, px, py, panW, rowH, cache){
+  // Use cached elements if available, only update text content
+  if(cache&&cache.children&&cache.children.length===data.length*2+2){
+    // Update background position
+    const bg=cache.children[0];
+    bg.setAttribute('x',px);bg.setAttribute('y',py);bg.setAttribute('width',panW);bg.setAttribute('height',data.length*rowH+8);
+    // Update top bar
+    const top=cache.children[1];
+    top.setAttribute('x',px);top.setAttribute('y',py);top.setAttribute('width',panW);
+    // Update text values only
+    let childIdx=2;
+    data.forEach((row,i)=>{
+      const midY=(py+6+i*rowH+rowH/2).toFixed(1);
+      // Label
+      const lbl=cache.children[childIdx];
+      lbl.setAttribute('x',px+6);lbl.setAttribute('y',midY);lbl.textContent=row.l;
+      childIdx++;
+      // Value
+      const val=cache.children[childIdx];
+      val.setAttribute('x',px+panW-5);val.setAttribute('y',midY);val.setAttribute('fill',row.c);val.textContent=row.v;
+      childIdx++;
+    });
+    return;
+  }
+  // First time: build elements
   g.innerHTML='';
-  // Background
   const bg=mkSvg('rect',{x:px,y:py,width:panW,height:data.length*rowH+8,fill:'rgba(255,255,255,.9)',stroke:'#ccd2e0','stroke-width':'1',rx:'3',ry:'3'});
   g.appendChild(bg);
   const top=mkSvg('rect',{x:px,y:py,width:panW,height:'2.5',fill:'#c42000',rx:'1',ry:'1'});
   g.appendChild(top);
   data.forEach((row,i)=>{
     const midY=(py+6+i*rowH+rowH/2).toFixed(1);
-    // Separator
-    if(i>0){
-      const sep=mkSvg('line',{x1:px+4,y1:(py+5+i*rowH).toFixed(1),x2:px+panW-4,y2:(py+5+i*rowH).toFixed(1),stroke:'rgba(180,190,210,.4)','stroke-width':'0.5'});
-      g.appendChild(sep);
-    }
-    // Label (left)
     const lbl=mkSvg('text',{x:px+6,y:midY,fill:'#3a4465','font-size':'11','font-family':'EB Garamond,Georgia,serif','text-anchor':'start','dominant-baseline':'middle'});
     lbl.textContent=row.l; g.appendChild(lbl);
-    // Value (right)
     const val=mkSvg('text',{x:px+panW-5,y:midY,fill:row.c,'font-size':'11.5','font-family':'Courier New,monospace','text-anchor':'end','dominant-baseline':'middle'});
     val.textContent=row.v; g.appendChild(val);
   });
@@ -708,6 +810,12 @@ function drawDataPanel(g, data, px, py, panW, rowH){
 function updateSvgPhasor(){
   const svg=document.getElementById('svgPhasor');
   if(!svg) return;
+
+  // Dispatch to realistic mode if active
+  if(S && S.animMode==='realistic'){
+    updateSvgPhasorRealistic(svg);
+    return;
+  }
 
   // Debounce size checks: only read clientWidth/clientHeight every 10 frames
   ph_sizeCheckCounter++;
@@ -729,90 +837,151 @@ function updateSvgPhasor(){
   const f2=v=>v.toFixed(1);
 
   // Background rect
-  svg.querySelector('#ph-bgrect').setAttribute('x','0');
-  svg.querySelector('#ph-bgrect').setAttribute('y','0');
-  svg.querySelector('#ph-bgrect').setAttribute('width',w);
-  svg.querySelector('#ph-bgrect').setAttribute('height',h);
+  const bgRect = safeQuerySelector(svg, '#ph-bgrect');
+  if (bgRect) {
+    bgRect.setAttribute('x', '0');
+    bgRect.setAttribute('y', '0');
+    bgRect.setAttribute('width', w);
+    bgRect.setAttribute('height', h);
+  }
 
   // Rings
   const rings=[{id:'ph-ring1',f:0.25,s:'#edf0f8',sw:'0.7'},{id:'ph-ring2',f:0.5,s:'#dde2ec',sw:'0.7'},
                {id:'ph-ring3',f:0.75,s:'#dde2ec',sw:'0.8'},{id:'ph-ring4',f:1.0,s:'#b8c0d4',sw:'1.6'}];
   rings.forEach(r=>{
-    const el=svg.querySelector('#'+r.id);
-    el.setAttribute('cx',f2(cx)); el.setAttribute('cy',f2(cy));
-    el.setAttribute('r',f2(R*r.f)); el.setAttribute('stroke',r.s); el.setAttribute('stroke-width',r.sw);
+    const el=safeQuerySelector(svg, '#'+r.id);
+    if (el) {
+      el.setAttribute('cx', f2(cx));
+      el.setAttribute('cy', f2(cy));
+      el.setAttribute('r', f2(R*r.f));
+      el.setAttribute('stroke', r.s);
+      el.setAttribute('stroke-width', r.sw);
+    }
   });
   // Bezel
-  const bv=svg.querySelector('#ph-bezel');
-  bv.setAttribute('cx',f2(cx)); bv.setAttribute('cy',f2(cy)); bv.setAttribute('r',f2(R+5));
+  const bv = safeQuerySelector(svg, '#ph-bezel');
+  if (bv) {
+    bv.setAttribute('cx', f2(cx));
+    bv.setAttribute('cy', f2(cy));
+    bv.setAttribute('r', f2(R+5));
+  }
 
   // Ticks (rebuild if size changed)
-  if(Math.abs(w-ph_lastW)<3&&Math.abs(h-ph_lastH)<3&&svg.querySelector('#ph-ticks').children.length===0){
-    buildTicks(svg,cx,cy,R);
-  } else if(phasorReady&&svg.querySelector('#ph-ticks').children.length===0){
-    buildTicks(svg,cx,cy,R);
+  const phTicks = safeQuerySelector(svg, '#ph-ticks');
+  if (phTicks) {
+    if (Math.abs(w-ph_lastW)<3 && Math.abs(h-ph_lastH)<3 && phTicks.children.length===0) {
+      buildTicks(svg, cx, cy, R);
+    } else if (phasorReady && phTicks.children.length===0) {
+      buildTicks(svg, cx, cy, R);
+    }
   }
 
   // Cross-hairs
-  const xh=svg.querySelector('#ph-xh'),xv=svg.querySelector('#ph-xv');
-  xh.setAttribute('x1',f2(cx-R)); xh.setAttribute('y1',f2(cy)); xh.setAttribute('x2',f2(cx+R)); xh.setAttribute('y2',f2(cy));
-  xv.setAttribute('x1',f2(cx)); xv.setAttribute('y1',f2(cy-R)); xv.setAttribute('x2',f2(cx)); xv.setAttribute('y2',f2(cy+R));
+  const xh = safeQuerySelector(svg, '#ph-xh');
+  const xv = safeQuerySelector(svg, '#ph-xv');
+  if (xh) {
+    xh.setAttribute('x1', f2(cx-R));
+    xh.setAttribute('y1', f2(cy));
+    xh.setAttribute('x2', f2(cx+R));
+    xh.setAttribute('y2', f2(cy));
+  }
+  if (xv) {
+    xv.setAttribute('x1', f2(cx));
+    xv.setAttribute('y1', f2(cy-R));
+    xv.setAttribute('x2', f2(cx));
+    xv.setAttribute('y2', f2(cy+R));
+  }
 
   // Angles
   const base=S.anim-Math.PI/2;
   const vt_a=base, ef_a=base+S.delta;
 
   // Delta arc
+  const arcEl = safeQuerySelector(svg, '#ph-arc');
   if(Math.abs(S.delta)>0.03){
     const arcR=R*0.37;
     const aMin=Math.min(vt_a,ef_a), aMax=Math.max(vt_a,ef_a);
     const x1=cx+arcR*Math.cos(aMin), y1=cy+arcR*Math.sin(aMin);
     const x2=cx+arcR*Math.cos(aMax), y2=cy+arcR*Math.sin(aMax);
     const lg=Math.abs(S.delta)>Math.PI?1:0;
-    const arcEl=svg.querySelector('#ph-arc');
-    arcEl.setAttribute('d',`M${f2(cx)},${f2(cy)} L${f2(x1)},${f2(y1)} A${f2(arcR)},${f2(arcR)} 0 ${lg},1 ${f2(x2)},${f2(y2)} Z`);
-    arcEl.setAttribute('visibility','visible');
-  }else{svg.querySelector('#ph-arc').setAttribute('visibility','hidden');}
+    if (arcEl) {
+      arcEl.setAttribute('d',`M${f2(cx)},${f2(cy)} L${f2(x1)},${f2(y1)} A${f2(arcR)},${f2(arcR)} 0 ${lg},1 ${f2(x2)},${f2(y2)} Z`);
+      arcEl.setAttribute('visibility','visible');
+    }
+  } else {
+    if (arcEl) arcEl.setAttribute('visibility','hidden');
+  }
 
   // Vt arrow
   const vtLen=R*0.80, sz=12;
   const vtX=cx+vtLen*Math.cos(vt_a), vtY=cy+vtLen*Math.sin(vt_a);
   const vtA=makeSvgArrow(null,cx,cy,vtX,vtY,sz);
-  const vtL=svg.querySelector('#ph-vt');
-  vtL.setAttribute('x1',f2(cx)); vtL.setAttribute('y1',f2(cy));
-  vtL.setAttribute('x2',vtA.lx2); vtL.setAttribute('y2',vtA.ly2);
-  svg.querySelector('#ph-vt-h').setAttribute('points',vtA.poly);
-  const vtLbl=svg.querySelector('#ph-vt-l');
-  vtLbl.setAttribute('x',f2(cx+R*1.04*Math.cos(vt_a))); vtLbl.setAttribute('y',f2(cy+R*1.04*Math.sin(vt_a)));
+  const vtL = safeQuerySelector(svg, '#ph-vt');
+  const vtH = safeQuerySelector(svg, '#ph-vt-h');
+  const vtLbl = safeQuerySelector(svg, '#ph-vt-l');
+  if (vtL) {
+    vtL.setAttribute('x1', f2(cx));
+    vtL.setAttribute('y1', f2(cy));
+    vtL.setAttribute('x2', vtA.lx2);
+    vtL.setAttribute('y2', vtA.ly2);
+  }
+  if (vtH) vtH.setAttribute('points', vtA.poly);
+  if (vtLbl) {
+    vtLbl.setAttribute('x', f2(cx+R*1.04*Math.cos(vt_a)));
+    vtLbl.setAttribute('y', f2(cy+R*1.04*Math.sin(vt_a)));
+  }
 
   // Ef arrow
   const efX=cx+vtLen*Math.cos(ef_a), efY=cy+vtLen*Math.sin(ef_a);
   const efC=S.sc_active?'#c42000':'#b85800';
   const efA=makeSvgArrow(null,cx,cy,efX,efY,sz);
-  const efL=svg.querySelector('#ph-ef');
-  efL.setAttribute('x1',f2(cx)); efL.setAttribute('y1',f2(cy));
-  efL.setAttribute('x2',efA.lx2); efL.setAttribute('y2',efA.ly2); efL.setAttribute('stroke',efC);
-  svg.querySelector('#ph-ef-h').setAttribute('points',efA.poly); svg.querySelector('#ph-ef-h').setAttribute('fill',efC);
-  const efLbl=svg.querySelector('#ph-ef-l');
-  efLbl.setAttribute('x',f2(cx+R*1.04*Math.cos(ef_a))); efLbl.setAttribute('y',f2(cy+R*1.04*Math.sin(ef_a)));
-  efLbl.setAttribute('fill',efC);
+  const efL = safeQuerySelector(svg, '#ph-ef');
+  const efH = safeQuerySelector(svg, '#ph-ef-h');
+  const efLbl = safeQuerySelector(svg, '#ph-ef-l');
+  if (efL) {
+    efL.setAttribute('x1', f2(cx));
+    efL.setAttribute('y1', f2(cy));
+    efL.setAttribute('x2', efA.lx2);
+    efL.setAttribute('y2', efA.ly2);
+    efL.setAttribute('stroke', efC);
+  }
+  if (efH) {
+    efH.setAttribute('points', efA.poly);
+    efH.setAttribute('fill', efC);
+  }
+  if (efLbl) {
+    efLbl.setAttribute('x', f2(cx+R*1.04*Math.cos(ef_a)));
+    efLbl.setAttribute('y', f2(cy+R*1.04*Math.sin(ef_a)));
+    efLbl.setAttribute('fill', efC);
+  }
 
   // Delta label in arc
+  const dl = safeQuerySelector(svg, '#ph-dlbl');
   if(Math.abs(S.delta)>0.06){
     const mid=base+S.delta/2, lr=R*0.53;
-    const dl=svg.querySelector('#ph-dlbl');
-    dl.setAttribute('x',f2(cx+lr*Math.cos(mid))); dl.setAttribute('y',f2(cy+lr*Math.sin(mid)));
-    dl.textContent='δ='+(S.delta*R2D).toFixed(1)+'°';
-    dl.setAttribute('visibility','visible');
-  }else{svg.querySelector('#ph-dlbl').setAttribute('visibility','hidden');}
+    if (dl) {
+      dl.setAttribute('x', f2(cx+lr*Math.cos(mid)));
+      dl.setAttribute('y', f2(cy+lr*Math.sin(mid)));
+      dl.textContent='δ='+(S.delta*R2D).toFixed(1)+'°';
+      dl.setAttribute('visibility','visible');
+    }
+  } else {
+    if (dl) dl.setAttribute('visibility','hidden');
+  }
 
   // Center dot
-  const ctr=svg.querySelector('#ph-ctr');
-  ctr.setAttribute('cx',f2(cx)); ctr.setAttribute('cy',f2(cy));
+  const ctr = safeQuerySelector(svg, '#ph-ctr');
+  if (ctr) {
+    ctr.setAttribute('cx', f2(cx));
+    ctr.setAttribute('cy', f2(cy));
+  }
 
   // Caption
-  const cap=svg.querySelector('#ph-cap');
-  cap.setAttribute('x',f2(cx)); cap.setAttribute('y',f2(h-3));
+  const cap = safeQuerySelector(svg, '#ph-cap');
+  if (cap) {
+    cap.setAttribute('x', f2(cx));
+    cap.setAttribute('y', f2(h-3));
+  }
 
   // Data panels
   const Pmax=S.Ef*S.V/S.Xs, Pe=getPe(S);
@@ -844,19 +1013,213 @@ function updateSvgPhasor(){
   const rx=Math.min(w-panW-4,cx+R+gap);
   const dy=Math.max(6,h/2-panH/2);
   if(panW>60){
-    drawDataPanel(document.getElementById('ph-left'),  ldata, lx, dy, panW, rowH);
-    drawDataPanel(document.getElementById('ph-right'), rdata, rx, dy, panW, rowH);
+    const leftEl=document.getElementById('ph-left');
+    const rightEl=document.getElementById('ph-right');
+    drawDataPanel(leftEl, ldata, lx, dy, panW, rowH, dpLeftCache);
+    drawDataPanel(rightEl, rdata, rx, dy, panW, rowH, dpRightCache);
+    // Cache elements after first draw
+    if(!dpLeftCache)dpLeftCache={children:Array.from(leftEl.children)};
+    if(!dpRightCache)dpRightCache={children:Array.from(rightEl.children)};
   }
+}
+
+// ================================================================
+// REALISTIC ROTOR-STATOR ANIMATION
+// ================================================================
+let realInit=false, real_lastW=0, real_lastH=0;
+
+function initSvgRealistic(svg,w,h){
+  svg.innerHTML='';
+  const cx=w/2, cy=h/2, R=Math.min(h*0.38,w*0.28);
+
+  // Definitions (gradients)
+  const defs=mkSvg('defs');
+
+  // Stator gradient
+  const sg=mkSvg('radialGradient',{id:'stator-grad',cx:'50%',cy:'50%',r:'50%'});
+  sg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'#e8ecf4'}));
+  sg.appendChild(mkSvg('stop',{'offset':'70%','stop-color':'#d0d8e8'}));
+  sg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'#b8c0d0'}));
+  defs.appendChild(sg);
+
+  // Rotor gradient
+  const rg=mkSvg('radialGradient',{id:'rotor-grad',cx:'50%',cy:'50%',r:'50%'});
+  rg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'#404860'}));
+  rg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'#202838'}));
+  defs.appendChild(rg);
+
+  // Field gradients
+  const rfg=mkSvg('radialGradient',{id:'rotor-field-grad',cx:'50%',cy:'50%',r:'60%'});
+  rfg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'rgba(0,80,200,0.6)'}));
+  rfg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'rgba(0,80,200,0)'}));
+  defs.appendChild(rfg);
+
+  const sfg=mkSvg('radialGradient',{id:'stator-field-grad',cx:'50%',cy:'50%',r:'60%'});
+  sfg.appendChild(mkSvg('stop',{'offset':'0%','stop-color':'rgba(200,80,0,0.5)'}));
+  sfg.appendChild(mkSvg('stop',{'offset':'100%','stop-color':'rgba(200,80,0,0)'}));
+  defs.appendChild(sfg);
+
+  svg.appendChild(defs);
+
+  // Stator outer ring (housing)
+  svg.appendChild(mkSvg('circle',{id:'stator-outer',cx:cx,cy:cy,r:R*1.1,fill:'#a0a8b8',stroke:'#808898','stroke-width':3}));
+
+  // Stator core (laminated iron)
+  svg.appendChild(mkSvg('circle',{id:'stator-core',cx:cx,cy:cy,r:R,fill:'url(#stator-grad)',stroke:'#8088a0','stroke-width':2}));
+
+  // Stator slots (36 slots for 3-phase)
+  const slots=36;
+  for(let i=0;i<slots;i++){
+    const ang=i*2*Math.PI/slots;
+    const x1=cx+(R*0.72)*Math.cos(ang);
+    const y1=cy+(R*0.72)*Math.sin(ang);
+    const x2=cx+(R*0.92)*Math.cos(ang);
+    const y2=cy+(R*0.92)*Math.sin(ang);
+    svg.appendChild(mkSvg('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:'#606878','stroke-width':1.5,'stroke-linecap':'round'}));
+  }
+
+  // Stator 3-phase windings (copper coils)
+  const phases=[
+    {id:'A',color:'#c85000',offset:0},
+    {id:'B',color:'#0068a8',offset:2*Math.PI/3},
+    {id:'C',color:'#00a848',offset:4*Math.PI/3}
+  ];
+  phases.forEach(ph=>{
+    for(let i=0;i<6;i++){
+      const slotAng=ph.offset + i*Math.PI/3;
+      const sx1=cx+(R*0.74)*Math.cos(slotAng);
+      const sy1=cy+(R*0.74)*Math.sin(slotAng);
+      const sx2=cx+(R*0.88)*Math.cos(slotAng);
+      const sy2=cy+(R*0.88)*Math.sin(slotAng);
+      svg.appendChild(mkSvg('circle',{
+        id:`winding-${ph.id}-${i}`,
+        cx:(sx1+sx2)/2,
+        cy:(sy1+sy2)/2,
+        r:R*0.045,
+        fill:ph.color,
+        stroke:'#402000',
+        'stroke-width':0.8
+      }));
+    }
+  });
+
+  // Stator rotating field (animated)
+  svg.appendChild(mkSvg('circle',{id:'stator-field',cx:cx,cy:cy,r:R*0.65,fill:'url(#stator-field-grad)',opacity:0.6}));
+
+  // Air gap
+  svg.appendChild(mkSvg('circle',{id:'airgap',cx:cx,cy:cy,r:R*0.55,fill:'none',stroke:'#c0c8d8','stroke-width':1,'stroke-dasharray':'4,4'}));
+
+  // Rotor (cylindrical for turbo generator)
+  const rotorR=R*0.5;
+  svg.appendChild(mkSvg('circle',{id:'rotor-body',cx:cx,cy:cy,r:rotorR,fill:'url(#rotor-grad)',stroke:'#101828','stroke-width':2}));
+
+  // Rotor field winding animation (shows excitation)
+  svg.appendChild(mkSvg('circle',{id:'rotor-field',cx:cx,cy:cy,r:rotorR*0.9,fill:'url(#rotor-field-grad)'}));
+
+  // Rotor poles indication (N-S for 2-pole)
+  // SAFETY: Default to 0 if S is null, prevents crash during initialization
+  const poleAng=(S && typeof S.delta === 'number')?S.delta:0;
+  svg.appendChild(mkSvg('text',{id:'pole-N',x:cx+rotorR*0.6*Math.cos(poleAng-Math.PI/2),y:cy+rotorR*0.6*Math.sin(poleAng-Math.PI/2),fill:'#0068d8','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'N'));
+  svg.appendChild(mkSvg('text',{id:'pole-S',x:cx+rotorR*0.6*Math.cos(poleAng+Math.PI/2),y:cy+rotorR*0.6*Math.sin(poleAng+Math.PI/2),fill:'#d84000','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'S'));
+
+  // Shaft center
+  svg.appendChild(mkSvg('circle',{id:'shaft',cx:cx,cy:cy,r:R*0.08,fill:'#404858',stroke:'#303848','stroke-width':1.5}));
+
+  // Legend
+  drawRealisticLegend(svg,w,h);
+
+  realInit=true;
+  real_lastW=w;
+  real_lastH=h;
+}
+
+function updateSvgPhasorRealistic(svg){
+  const w=svg.clientWidth, h=svg.clientHeight;
+  if(w<10||h<10) return;
+
+  if(!realInit||Math.abs(w-real_lastW)>5||Math.abs(h-real_lastH)>5){
+    initSvgRealistic(svg,w,h);
+  }
+
+  if(!S) return;
+
+  const cx=w/2, cy=h/2, R=Math.min(h*0.38,w*0.28);
+  const rotorR=R*0.5;
+
+  // Update rotor position based on delta angle
+  const base=S.anim-Math.PI/2;
+  const rotorAng=base+S.delta;
+
+  // Update pole positions
+  const poleN = safeQuerySelector(svg, '#pole-N');
+  const poleS = safeQuerySelector(svg, '#pole-S');
+  if(poleN){
+    poleN.setAttribute('x', cx+rotorR*0.55*Math.cos(rotorAng));
+    poleN.setAttribute('y', cy+rotorR*0.55*Math.sin(rotorAng));
+  }
+  if(poleS){
+    poleS.setAttribute('x', cx+rotorR*0.55*Math.cos(rotorAng+Math.PI));
+    poleS.setAttribute('y', cy+rotorR*0.55*Math.sin(rotorAng+Math.PI));
+  }
+
+  // Update rotor field intensity based on Ef
+  const rotorField = safeQuerySelector(svg, '#rotor-field');
+  if(rotorField){
+    const efNorm=Math.min(S.Ef/3,1);
+    rotorField.setAttribute('opacity', 0.3+efNorm*0.5);
+    // Scale field radius with excitation
+    const fieldR=rotorR*(0.6+efNorm*0.3);
+    rotorField.setAttribute('r', fieldR);
+  }
+
+  // Update stator rotating field (rotates at sync speed)
+  const statorField = safeQuerySelector(svg, '#stator-field');
+  if(statorField){
+    const syncAng=base; // Stator field rotates at sync speed
+    statorField.setAttribute('opacity', 0.4+0.2*Math.sin(Date.now()/200));
+  }
+
+  // Update stator winding colors based on current phase
+  const phases=['A','B','C'];
+  const phaseColors=['#c85000','#0068a8','#00a848'];
+  const time=Date.now()/1000;
+  phases.forEach((ph,pi)=>{
+    const phaseAng=base+pi*2*Math.PI/3;
+    const intensity=0.5+0.5*Math.sin(time*10+pi*2*Math.PI/3); // Pulsing effect
+    for(let i=0;i<6;i++){
+      const coil = safeQuerySelector(svg, `#winding-${ph}-${i}`);
+      if(coil){
+        const baseColor=phaseColors[pi];
+        coil.setAttribute('opacity', 0.4+intensity*0.6);
+      }
+    }
+  });
+}
+
+function drawRealisticLegend(svg,w,h){
+  const legendX=10, legendY=h-80;
+  const items=[
+    {label:'Stator Core',color:'#d0d8e8'},
+    {label:'Stator Windings (3-φ)',color:'#c85000'},
+    {label:'Rotor Field',color:'#404860'},
+    {label:'Rotor Excitation',color:'#0050c8'},
+  ];
+  items.forEach((it,i)=>{
+    const y=legendY+i*16;
+    svg.appendChild(mkSvg('rect',{x:legendX,y:y,width:12,height:12,fill:it.color,stroke:'#404858','stroke-width':0.5,'rx':2}));
+    svg.appendChild(mkSvg('text',{x:legendX+18,y:y+10,'font-size':11,fill:'#505868','font-family':'var(--body)'},it.label));
+  });
 }
 
 // ================================================================
 // SVG P-DELTA  (full SVG, interactive, EAC areas)
 // ================================================================
 let pdInit=false, pd_lastW=0, pd_lastH=0;
-const svgGet=id=>document.getElementById(id);
-function setA(id,attrs){const el=svgGet(id);if(!el)return;for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);}
-function setT(id,txt){const el=svgGet(id);if(el)el.textContent=txt;}
-function setV(id,show){const el=svgGet(id);if(el)el.setAttribute('visibility',show?'visible':'hidden');}
+// Safe element access with null check
+const svgGet=id=>{try{const el=document.getElementById(id);if(!el)console.warn('Element not found:',id);return el;}catch(e){console.warn('svgGet error:',id,e);return null;}};
+function setA(id,attrs){const el=svgGet(id);if(!el)return false;try{for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);return true;}catch(e){console.warn('setA error:',id,e);return false;}}
+function setT(id,txt){const el=svgGet(id);if(el){try{el.textContent=txt;return true;}catch(e){console.warn('setT error:',id,e);}}return false;}
+function setV(id,show){const el=svgGet(id);if(el){try{el.setAttribute('visibility',show?'visible':'hidden');return true;}catch(e){console.warn('setV error:',id,e);}}return false;}
 
 let eacAnns=[], cv2_mx=null, cv2_my=null;
 
@@ -1206,11 +1569,12 @@ function initTimeCharts(){
   if(oldContainer)oldContainer.remove();
 
   // Create container for 4 stacked charts with flexbox
+  // Layout: 3 charts di atas (tanpa x-axis), 1 chart di bawah (dengan x-axis)
   const container=document.createElement('div');
   container.setAttribute('data-chart-container','true');
   container.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;gap:2px;padding:6px;background:#f4f6fb;pointer-events:auto;';
 
-  // Create chart wrappers with aspect ratio control + overflow:hidden to prevent Chart.js from affecting scroll
+  // Create chart wrappers - bottom chart will have x-axis
   for(let i=0;i<4;i++){
     const wrapper=document.createElement('div');
     wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:60px;overflow:hidden;';
@@ -1236,55 +1600,95 @@ function initTimeCharts(){
       console.warn(`Chart canvas ${i} has invalid dimensions: ${rect.width}x${rect.height}`);
     }
   });
-  const baseOpts={
+
+  // Base options dengan animation untuk smooth x-axis shift
+  const baseOptsNoX={
     responsive:false,
     maintainAspectRatio:false,
-    animation:false,
+    animation:{
+      duration:150, // Smooth transition untuk scale changes
+      easing:'easeOutQuart'
+    },
     interaction:{mode:'index',intersect:false},
-    plugins:{legend:{display:false,position:'top'},tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}},
+    plugins:{
+      legend:{display:false},
+      tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}
+    },
     scales:{
       x:{
         type:'linear',
-        display:true,
+        display:false, // HIDDEN untuk chart atas
         min:0,
-        max:30,
-        grid:{display:true,color:'#e8ecf4'},
-        ticks:{color:'#3a4465',font:{size:10},stepSize:5},
-        border:{color:'#ccd2e0'},
-        title:{display:true,text:'Time (s)',color:'#3a4465'}
+        max:30
       },
       y:{
         display:true,
-        grid:{color:'#e8ecf4'},
-        ticks:{color:'#3a4465',font:{size:10}},
+        grid:{color:'#e8ecf4',lineWidth:0.5},
+        ticks:{color:'#3a4465',font:{size:9},padding:4},
         border:{color:'#ccd2e0'}
       }
     },
     elements:{point:{radius:0,hoverRadius:3},line:{tension:0.3,borderWidth:2}}
   };
 
+  // Bottom chart options WITH visible x-axis
+  const baseOptsWithX={
+    responsive:false,
+    maintainAspectRatio:false,
+    animation:{
+      duration:150,
+      easing:'easeOutQuart'
+    },
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}
+    },
+    scales:{
+      x:{
+        type:'linear',
+        display:true,
+        min:0,
+        max:30,
+        grid:{display:true,color:'#e8ecf4',lineWidth:0.5},
+        ticks:{color:'#3a4465',font:{size:9},stepSize:5,padding:6},
+        border:{color:'#ccd2e0'},
+        title:{display:true,text:'Time (s)',color:'#3a4465',padding:4,font:{size:10}}
+      },
+      y:{
+        display:true,
+        grid:{color:'#e8ecf4',lineWidth:0.5},
+        ticks:{color:'#3a4465',font:{size:9},padding:4},
+        border:{color:'#ccd2e0'}
+      }
+    },
+    elements:{point:{radius:0,hoverRadius:3},line:{tension:0.3,borderWidth:2}}
+  };
+
+  // Chart 1-3: WITHOUT x-axis display (hanya garis grid vertikal saja)
   timeCharts.delta=new Chart(canvases[0],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'δ (degrees)',color:'#806000',font:{weight:'bold'}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'δ (deg)',color:'#806000',font:{weight:'bold',size:10}}}}}
   });
 
   timeCharts.omega=new Chart(canvases[1],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold'}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold',size:10}}}}}
   });
 
   timeCharts.power=new Chart(canvases[2],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold'}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold',size:10}}}}}
   });
 
+  // Chart 4 (BOTTOM): WITH x-axis display - satu-satunya yang tampil
   timeCharts.freq=new Chart(canvases[3],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold'}}}}}
+    options:{...baseOptsWithX,scales:{...baseOptsWithX.scales,y:{...baseOptsWithX.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold',size:10}}}}}
   });
 
   // Set initial canvas sizes
@@ -1300,29 +1704,119 @@ function resizeTimeCharts(){
 }
 
 let chartUpdateCounter=0;
+const CHART_UPDATE_INTERVAL=5; // Update every 5 frames (12 Hz) — balanced smoothness vs performance
+const MAX_CHART_POINTS=600; // Maximum points to render (10 seconds at 60 Hz)
+
+/**
+ * Smart decimation untuk rendering.
+ * Mengambil titik data secara strategis untuk menjaga smoothness visual.
+ *
+ * @param {Array} arr - Array input
+ * @param {number} maxPoints - Maksimum titik yang akan dirender
+ * @returns {Array} Array yang sudah di-decimate
+ */
+function smartDecimate(arr, maxPoints) {
+  if (arr.length <= maxPoints) return arr;
+
+  const result = [];
+  const step = arr.length / maxPoints;
+
+  // Always include first point
+  result.push(arr[0]);
+
+  // Sample points evenly
+  for (let i = 1; i < maxPoints - 1; i++) {
+    const idx = Math.floor(i * step);
+    result.push(arr[idx]);
+  }
+
+  // Always include last point
+  result.push(arr[arr.length - 1]);
+
+  return result;
+}
+
+/**
+ * Optimized batch data extraction — single pass through history.
+ * Menghindari multiple .map() calls yang mahal.
+ *
+ * @param {Array} hist - History array
+ * @returns {Object} Semua dataset yang diperlukan dalam single pass
+ */
+function extractChartData(hist){
+  const deltaData=[];
+  const omegaData=[];
+  const peData=[];
+  const pmData=[];
+  const fData=[];
+  const fnomData=[];
+  const peValues=[];
+  const pmValues=[];
+  const ddegValues=[];
+  const omegaValues=[];
+  const fValues=[];
+
+  for(let i=0;i<hist.length;i++){
+    const d=hist[i];
+    deltaData.push({x:d.t,y:d.ddeg});
+    omegaData.push({x:d.t,y:d.omega});
+    peData.push({x:d.t,y:d.Pe});
+    pmData.push({x:d.t,y:d.Pm});
+    fData.push({x:d.t,y:d.f});
+    fnomData.push({x:d.t,y:F0});
+    peValues.push(d.Pe);
+    pmValues.push(d.Pm);
+    ddegValues.push(d.ddeg);
+    omegaValues.push(d.omega);
+    fValues.push(d.f);
+  }
+
+  return{
+    delta:deltaData,
+    omega:omegaData,
+    pe:peData,
+    pm:pmData,
+    f:fData,
+    fnom:fnomData,
+    peValues,
+    pmValues,
+    ddegValues,
+    omegaValues,
+    fValues
+  };
+}
+
 function updateTimeCharts(){
   const hist=S.hist;
   if(hist.length<2||Object.keys(timeCharts).length===0)return;
 
-  // Throttle chart updates to every 5 frames to reduce layout thrashing
+  // Skip chart updates if user is scrolling to prevent autoscroll
+  if(isUserScrolling)return;
+
+  // Throttle chart updates untuk performa (12 Hz = smooth tapi tidak berat)
   chartUpdateCounter++;
-  if(chartUpdateCounter<5)return;
+  if(chartUpdateCounter<CHART_UPDATE_INTERVAL)return;
   chartUpdateCounter=0;
 
   const te=hist[hist.length-1].t;
   const ts=Math.max(0,te-HWIN);
-  const data=hist.filter(d=>d.t>=ts&&d.t<=te);
+
+  // Filter to time window
+  const windowData=hist.filter(d=>d.t>=ts&&d.t<=te);
+
+  // Smart decimation untuk menjaga smoothness visual
+  const data=smartDecimate(windowData, MAX_CHART_POINTS);
 
   // Calculate X-axis range with sliding window
-  // xMin=0 until t=30s, then slides to maintain 30s window
-  // xMax always follows current time
   const xMin=ts;
   const xMax=te;
 
+  // Single-pass data extraction (replaces 8 separate .map() calls)
+  const chartData=extractChartData(data);
+
   // Delta chart with stabilized scale
-  const deltaData=data.map(d=>({x:d.t,y:d.ddeg}));
-  const deltaScale=chartStabilizers.delta.update(calcYScale(data.map(d=>d.ddeg),0.1));
-  timeCharts.delta.data.datasets=[{label:'δ',data:deltaData,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)'}];
+  const deltaScale=chartStabilizers.delta.update(calcYScale(chartData.ddegValues,0.1));
+  timeCharts.delta.data.datasets=[{label:'δ',data:chartData.delta,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)',fill:false,tension:0.2}];
   timeCharts.delta.options.scales.y.min=deltaScale.min;
   timeCharts.delta.options.scales.y.max=deltaScale.max;
   timeCharts.delta.options.scales.x.min=xMin;
@@ -1330,9 +1824,8 @@ function updateTimeCharts(){
   timeCharts.delta.update('none');
 
   // Omega chart with stabilized scale
-  const omegaData=data.map(d=>({x:d.t,y:d.omega}));
-  const omegaScale=chartStabilizers.omega.update(calcYScale(data.map(d=>d.omega),0.1));
-  timeCharts.omega.data.datasets=[{label:'Δω',data:omegaData,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)'}];
+  const omegaScale=chartStabilizers.omega.update(calcYScale(chartData.omegaValues,0.1));
+  timeCharts.omega.data.datasets=[{label:'Δω',data:chartData.omega,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)',fill:false,tension:0.2}];
   timeCharts.omega.options.scales.y.min=omegaScale.min;
   timeCharts.omega.options.scales.y.max=omegaScale.max;
   timeCharts.omega.options.scales.x.min=xMin;
@@ -1340,12 +1833,10 @@ function updateTimeCharts(){
   timeCharts.omega.update('none');
 
   // Power chart with stabilized scale
-  const peData=data.map(d=>({x:d.t,y:d.Pe}));
-  const pmData=data.map(d=>({x:d.t,y:d.Pm}));
-  const powerScale=chartStabilizers.power.update(calcYScale([...data.map(d=>d.Pe),...data.map(d=>d.Pm)],0.1));
+  const powerScale=chartStabilizers.power.update(calcYScale([...chartData.peValues,...chartData.pmValues],0.1));
   timeCharts.power.data.datasets=[
-    {label:'Pe',data:peData,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)'},
-    {label:'Pm',data:pmData,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)'}
+    {label:'Pe',data:chartData.pe,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)',fill:false,tension:0.2},
+    {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false,tension:0.2}
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
@@ -1353,12 +1844,11 @@ function updateTimeCharts(){
   timeCharts.power.options.scales.x.max=xMax;
   timeCharts.power.update('none');
 
-  // Frequency chart with stabilized scale (centered at 50 Hz)
-  const fData=data.map(d=>({x:d.t,y:d.f}));
-  const fScale=chartStabilizers.freq.update(calcYScale(data.map(d=>d.f),0.05));
+  // Frequency chart with stabilized scale
+  const fScale=chartStabilizers.freq.update(calcYScale(chartData.fValues,0.05));
   timeCharts.freq.data.datasets=[
-    {label:'f',data:fData,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)'},
-    {label:'fnom',data:data.map(d=>({x:d.t,y:F0})),borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1}
+    {label:'f',data:chartData.f,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)',fill:false,tension:0.2},
+    {label:'fnom',data:chartData.fnom,borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1,fill:false}
   ];
   timeCharts.freq.options.scales.y.min=fScale.min;
   timeCharts.freq.options.scales.y.max=fScale.max;
@@ -1377,22 +1867,37 @@ function drawTime(){
 let isUserScrolling=false;
 let scrollLockTimeout=null;
 function renderAll(){
-  // Skip rendering if user is actively scrolling to prevent autoscroll
-  if(isUserScrolling)return;
-
+  // Always update SVG animations (phasor and P-delta) even during scroll
   updateSvgPhasor();
   updateSvgPdelta();
-  drawTime();
   updateHdr();
-  resizeTimeCharts();
+
+  // Only skip Chart.js updates during scroll (this is what causes autoscroll)
+  if(!isUserScrolling){
+    drawTime();
+    resizeTimeCharts();
+  }
 }
 function loop(ts){
   if(!lastRAF)lastRAF=ts;
   const rdt=Math.min((ts-lastRAF)/1000,.1);
   lastRAF=ts;
-  stepPhys(S,rdt);
-  renderAll();
-  requestAnimationFrame(loop);
+  try{
+    stepPhys(S,rdt);
+    renderAll();
+    requestAnimationFrame(loop);
+  }catch(err){
+    console.error('Animation loop error:', err);
+    console.error('Stack trace:', err.stack);
+    console.error('Current state:', {
+      animMode: S?.animMode,
+      phasorReady,
+      realInit,
+      delta: S?.delta,
+      omega: S?.omega
+    });
+    showFatalError('Fatal error in animation loop.<br><br>'+err.message+'<br><small>Reload simulator to restart.</small>');
+  }
 }
 
 // ================================================================
@@ -1404,6 +1909,26 @@ function setMode(m){
   document.getElementById('bIsland').classList.toggle('on',m==='island');
   // Reset chart scales when mode changes
   Object.values(chartStabilizers).forEach(s=>s.reset());
+}
+function setAnimMode(mode){
+  if(!S) return;
+  // Validate mode parameter
+  if(mode!=='phasor' && mode!=='realistic'){
+    console.warn('Invalid animation mode:',mode);
+    return;
+  }
+  // Guard: ensure SVG is initialized before switching modes
+  const svg = document.getElementById('svgPhasor');
+  if(!svg) return;
+
+  // Mark as not ready during mode switch to prevent race conditions
+  phasorReady = false;
+
+  S.animMode=mode;
+  const phasorBtn=document.getElementById('amode-phasor');
+  const realisticBtn=document.getElementById('amode-realistic');
+  if(phasorBtn) phasorBtn.classList.toggle('active',mode==='phasor');
+  if(realisticBtn) realisticBtn.classList.toggle('active',mode==='realistic');
 }
 function updTrack(el){
   const pct=((+el.value-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';
@@ -1463,19 +1988,33 @@ function togglePane(n){
 // ================================================================
 function initDragHandles(){
   let drag=null,sy=0,sh=0;
+  const vizScroll=document.getElementById('vizScroll');
+  let lockedScrollTop=0;
+
   document.querySelectorAll('.drag-handle').forEach(h=>{
     h.addEventListener('mousedown',e=>{
       drag=document.getElementById(h.dataset.pane);
-      sy=e.clientY;sh=drag.offsetHeight;e.preventDefault();
+      sy=e.clientY;sh=drag.offsetHeight;
+      if(vizScroll)lockedScrollTop=vizScroll.scrollTop;
+      e.preventDefault();
     });
   });
   document.addEventListener('mousemove',e=>{
     if(!drag)return;
     const nH=Math.max(120,sh+(e.clientY-sy));
     drag.style.height=nH+'px';
+    // Lock scroll position during drag to prevent autoscroll
+    if(vizScroll)vizScroll.scrollTop=lockedScrollTop;
     e.preventDefault();
   });
-  document.addEventListener('mouseup',()=>{drag=null;});
+  document.addEventListener('mouseup',()=>{
+    drag=null;
+    // Keep scroll locked briefly after mouseup
+    if(vizScroll){
+      const finalScroll=lockedScrollTop;
+      setTimeout(()=>{vizScroll.scrollTop=finalScroll;},50);
+    }
+  });
 }
 
 // ================================================================
@@ -1725,7 +2264,17 @@ window.addEventListener('load',()=>{
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
   drawRLRChart(S);
 
-  // No scroll preservation needed - disabled Chart.js resize() calls that cause layout shifts
+  // Detect user scrolling and pause rendering during scroll
+  const vizScroll=document.getElementById('vizScroll');
+  if(vizScroll){
+    vizScroll.addEventListener('scroll',()=>{
+      isUserScrolling=true;
+      if(scrollLockTimeout)clearTimeout(scrollLockTimeout);
+      scrollLockTimeout=setTimeout(()=>{
+        isUserScrolling=false;
+      },200);
+    },{passive:true});
+  }
 
   // Use nested RAF to ensure flex layout is computed before starting loop
   // This solves the blank panel bug (pane.clientWidth was 0 at synchronous load)
