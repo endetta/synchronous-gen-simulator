@@ -7,14 +7,19 @@ status: SELESAI
 # Sesi: Fix Performance Lag pada Synchronous Generator Simulator
 
 **Waktu mulai:** 2026-09-09 10:47 WIB
+**Waktu selesai:** 2026-09-09 11:20 WIB
 **Commit sebelum:** 9a5967d feat: add realistic rotor-stator animation with toggle buttons
 
 ## Masalah
 
+### Masalah 1: Lag setelah berjalan lama
 Simulator menjadi sangat lag ketika simulasi berjalan semakin lama. User melaporkan:
 - Frame rate drop signifikan setelah beberapa menit
 - UI tidak responsif saat update chart
 - Semakin lama simulasi berjalan, semakin parah lag-nya
+
+### Masalah 2: Data time series patah-patah / diskrit
+User melaporkan: "data time series masih laggy, data yang ditampilkan dan penyajiannya tidak laggy. Pengambilan hasil dataanya diskrit/patah2, seperti hanya mengambil data tiap 1 detik saja, tidak sinkron dengan animasi generator."
 
 ## Analisis Root Cause
 

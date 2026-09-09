@@ -321,7 +321,7 @@ input[type=number]:focus{border-color:var(--etap)}
 // CONSTANTS  (Kundur 1994 notation)
 // ================================================================
 const F0=50, WS=2*Math.PI*50, R2D=180/Math.PI, D2R=Math.PI/180;
-const PHDT=0.003, HSTEP=0.04, HWIN=30;
+const PHDT=0.003, HSTEP=0.016, HWIN=30; // HSTEP = 16ms (60 Hz) untuk smooth chart
 const VSPD=2*Math.PI/7; // visual phasor 1rev/7s
 const NS='http://www.w3.org/2000/svg';
 
@@ -568,7 +568,8 @@ function stepPhys(s,rdt){
     const Pe=getPe(s);
     const Pm_eff=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
     const f=s.mode==='grid'?F0:F0*(1+s.omega);
-    pushHistory(s.hist,{t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active},900);
+    // Keep 30 seconds of history at 60 Hz = 1800 points (was 900 at 25 Hz)
+    pushHistory(s.hist,{t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active},1800);
     s.hlast=s.t;
     autoNarr(s); updateCards(s);
     if(rlr_running)updateRLRDisplay(s);
@@ -1116,7 +1117,8 @@ function initSvgRealistic(svg,w,h){
   svg.appendChild(mkSvg('circle',{id:'rotor-field',cx:cx,cy:cy,r:rotorR*0.9,fill:'url(#rotor-field-grad)'}));
 
   // Rotor poles indication (N-S for 2-pole)
-  const poleAng=S?S.delta:0;
+  // SAFETY: Default to 0 if S is null, prevents crash during initialization
+  const poleAng=(S && typeof S.delta === 'number')?S.delta:0;
   svg.appendChild(mkSvg('text',{id:'pole-N',x:cx+rotorR*0.6*Math.cos(poleAng-Math.PI/2),y:cy+rotorR*0.6*Math.sin(poleAng-Math.PI/2),fill:'#0068d8','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'N'));
   svg.appendChild(mkSvg('text',{id:'pole-S',x:cx+rotorR*0.6*Math.cos(poleAng+Math.PI/2),y:cy+rotorR*0.6*Math.sin(poleAng+Math.PI/2),fill:'#d84000','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'S'));
 
@@ -1213,10 +1215,11 @@ function drawRealisticLegend(svg,w,h){
 // SVG P-DELTA  (full SVG, interactive, EAC areas)
 // ================================================================
 let pdInit=false, pd_lastW=0, pd_lastH=0;
-const svgGet=id=>document.getElementById(id);
-function setA(id,attrs){const el=svgGet(id);if(!el)return;for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);}
-function setT(id,txt){const el=svgGet(id);if(el)el.textContent=txt;}
-function setV(id,show){const el=svgGet(id);if(el)el.setAttribute('visibility',show?'visible':'hidden');}
+// Safe element access with null check
+const svgGet=id=>{try{const el=document.getElementById(id);if(!el)console.warn('Element not found:',id);return el;}catch(e){console.warn('svgGet error:',id,e);return null;}};
+function setA(id,attrs){const el=svgGet(id);if(!el)return false;try{for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);return true;}catch(e){console.warn('setA error:',id,e);return false;}}
+function setT(id,txt){const el=svgGet(id);if(el){try{el.textContent=txt;return true;}catch(e){console.warn('setT error:',id,e);}}return false;}
+function setV(id,show){const el=svgGet(id);if(el){try{el.setAttribute('visibility',show?'visible':'hidden');return true;}catch(e){console.warn('setV error:',id,e);}}return false;}
 
 let eacAnns=[], cv2_mx=null, cv2_my=null;
 
@@ -1701,27 +1704,35 @@ function resizeTimeCharts(){
 }
 
 let chartUpdateCounter=0;
-const CHART_UPDATE_INTERVAL=15; // Update every 15 frames (4 Hz) — sufficient for visual smoothness
-const DATA_DECIMATION=5; // Keep 1 out of every 5 points — reduces array ops by 80%
+const CHART_UPDATE_INTERVAL=5; // Update every 5 frames (12 Hz) — balanced smoothness vs performance
+const MAX_CHART_POINTS=600; // Maximum points to render (10 seconds at 60 Hz)
 
 /**
- * Decimate array untuk mengurangi jumlah titik data yang dirender.
- * Mengambil setiap titik ke-n dari array untuk performa optimal.
+ * Smart decimation untuk rendering.
+ * Mengambil titik data secara strategis untuk menjaga smoothness visual.
  *
  * @param {Array} arr - Array input
- * @param {number} factor - Faktor decimation (ambil setiap titik ke-factor)
+ * @param {number} maxPoints - Maksimum titik yang akan dirender
  * @returns {Array} Array yang sudah di-decimate
  */
-function decimateArray(arr,factor){
-  if(factor<=1||arr.length<factor*2)return arr;
-  const result=[];
-  for(let i=0;i<arr.length;i+=factor){
-    result.push(arr[i]);
+function smartDecimate(arr, maxPoints) {
+  if (arr.length <= maxPoints) return arr;
+
+  const result = [];
+  const step = arr.length / maxPoints;
+
+  // Always include first point
+  result.push(arr[0]);
+
+  // Sample points evenly
+  for (let i = 1; i < maxPoints - 1; i++) {
+    const idx = Math.floor(i * step);
+    result.push(arr[idx]);
   }
-  // Always include last point for continuity
-  if(arr.length>0&&result[result.length-1]!==arr[arr.length-1]){
-    result.push(arr[arr.length-1]);
-  }
+
+  // Always include last point
+  result.push(arr[arr.length - 1]);
+
   return result;
 }
 
@@ -1782,8 +1793,7 @@ function updateTimeCharts(){
   // Skip chart updates if user is scrolling to prevent autoscroll
   if(isUserScrolling)return;
 
-  // Throttle chart updates to every N frames for performance
-  // 15 frames = 4 Hz updates (still visually smooth)
+  // Throttle chart updates untuk performa (12 Hz = smooth tapi tidak berat)
   chartUpdateCounter++;
   if(chartUpdateCounter<CHART_UPDATE_INTERVAL)return;
   chartUpdateCounter=0;
@@ -1791,9 +1801,11 @@ function updateTimeCharts(){
   const te=hist[hist.length-1].t;
   const ts=Math.max(0,te-HWIN);
 
-  // Filter to time window, then decimate
+  // Filter to time window
   const windowData=hist.filter(d=>d.t>=ts&&d.t<=te);
-  const data=decimateArray(windowData,DATA_DECIMATION);
+
+  // Smart decimation untuk menjaga smoothness visual
+  const data=smartDecimate(windowData, MAX_CHART_POINTS);
 
   // Calculate X-axis range with sliding window
   const xMin=ts;
@@ -1804,16 +1816,16 @@ function updateTimeCharts(){
 
   // Delta chart with stabilized scale
   const deltaScale=chartStabilizers.delta.update(calcYScale(chartData.ddegValues,0.1));
-  timeCharts.delta.data.datasets=[{label:'δ',data:chartData.delta,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)',fill:false}];
+  timeCharts.delta.data.datasets=[{label:'δ',data:chartData.delta,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)',fill:false,tension:0.2}];
   timeCharts.delta.options.scales.y.min=deltaScale.min;
   timeCharts.delta.options.scales.y.max=deltaScale.max;
   timeCharts.delta.options.scales.x.min=xMin;
   timeCharts.delta.options.scales.x.max=xMax;
-  timeCharts.delta.update('none'); // 'none' mode = no animation overhead
+  timeCharts.delta.update('none');
 
   // Omega chart with stabilized scale
   const omegaScale=chartStabilizers.omega.update(calcYScale(chartData.omegaValues,0.1));
-  timeCharts.omega.data.datasets=[{label:'Δω',data:chartData.omega,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)',fill:false}];
+  timeCharts.omega.data.datasets=[{label:'Δω',data:chartData.omega,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)',fill:false,tension:0.2}];
   timeCharts.omega.options.scales.y.min=omegaScale.min;
   timeCharts.omega.options.scales.y.max=omegaScale.max;
   timeCharts.omega.options.scales.x.min=xMin;
@@ -1823,8 +1835,8 @@ function updateTimeCharts(){
   // Power chart with stabilized scale
   const powerScale=chartStabilizers.power.update(calcYScale([...chartData.peValues,...chartData.pmValues],0.1));
   timeCharts.power.data.datasets=[
-    {label:'Pe',data:chartData.pe,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)',fill:false},
-    {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false}
+    {label:'Pe',data:chartData.pe,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)',fill:false,tension:0.2},
+    {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false,tension:0.2}
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
@@ -1835,7 +1847,7 @@ function updateTimeCharts(){
   // Frequency chart with stabilized scale
   const fScale=chartStabilizers.freq.update(calcYScale(chartData.fValues,0.05));
   timeCharts.freq.data.datasets=[
-    {label:'f',data:chartData.f,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)',fill:false},
+    {label:'f',data:chartData.f,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)',fill:false,tension:0.2},
     {label:'fnom',data:chartData.fnom,borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1,fill:false}
   ];
   timeCharts.freq.options.scales.y.min=fScale.min;
@@ -1900,6 +1912,11 @@ function setMode(m){
 }
 function setAnimMode(mode){
   if(!S) return;
+  // Validate mode parameter
+  if(mode!=='phasor' && mode!=='realistic'){
+    console.warn('Invalid animation mode:',mode);
+    return;
+  }
   // Guard: ensure SVG is initialized before switching modes
   const svg = document.getElementById('svgPhasor');
   if(!svg) return;
@@ -1908,8 +1925,10 @@ function setAnimMode(mode){
   phasorReady = false;
 
   S.animMode=mode;
-  document.getElementById('amode-phasor').classList.toggle('active',mode==='phasor');
-  document.getElementById('amode-realistic').classList.toggle('active',mode==='realistic');
+  const phasorBtn=document.getElementById('amode-phasor');
+  const realisticBtn=document.getElementById('amode-realistic');
+  if(phasorBtn) phasorBtn.classList.toggle('active',mode==='phasor');
+  if(realisticBtn) realisticBtn.classList.toggle('active',mode==='realistic');
 }
 function updTrack(el){
   const pct=((+el.value-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';

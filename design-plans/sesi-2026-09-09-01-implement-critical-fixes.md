@@ -191,3 +191,128 @@ Dari 8 fixes yang didefinisikan dalam spec:
 - Test coverage tetap 100% (113/113 tests passing)
 - Tidak ada perubahan visual UI — hanya logic internal
 - Helper functions bersifat defensive dan tidak mengubah happy-path behavior
+
+---
+
+## Tambahan: Defensive Coding Fixes (2026-09-09 04:10 UTC)
+
+### 8. Null Check untuk `initSvgRealistic()` (MEDIUM)
+
+**Lokasi:** Line 1119  
+**Masalah:** Fungsi mengakses `S.delta` tanpa null check yang memadai selama inisialisasi.
+
+**Kode sebelum:**
+```javascript
+const poleAng=S?S.delta:0;
+```
+
+**Kode sesudah:**
+```javascript
+// SAFETY: Default to 0 if S is null, prevents crash during initialization
+const poleAng=(S && typeof S.delta === 'number')?S.delta:0;
+```
+
+**Alasan:** Type check tambahan memastikan `S.delta` adalah number sebelum digunakan, mencegah crash jika `S` null atau `delta` undefined.
+
+### 9. Defensive Coding untuk `setA()`, `setT()`, `setV()` Helpers (MEDIUM)
+
+**Lokasi:** Lines 1216-1219  
+**Masalah:** Helper functions tidak memiliki error handling dan console logging untuk debugging.
+
+**Kode sebelum:**
+```javascript
+const svgGet=id=>document.getElementById(id);
+function setA(id,attrs){const el=svgGet(id);if(!el)return;for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);}
+function setT(id,txt){const el=svgGet(id);if(el)el.textContent=txt;}
+function setV(id,show){const el=svgGet(id);if(el)el.setAttribute('visibility',show?'visible':'hidden');}
+```
+
+**Kode sesudah:**
+```javascript
+// Safe element access with null check
+const svgGet=id=>{try{const el=document.getElementById(id);if(!el)console.warn('Element not found:',id);return el;}catch(e){console.warn('svgGet error:',id,e);return null;}};
+function setA(id,attrs){const el=svgGet(id);if(!el)return false;try{for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);return true;}catch(e){console.warn('setA error:',id,e);return false;}}
+function setT(id,txt){const el=svgGet(id);if(el){try{el.textContent=txt;return true;}catch(e){console.warn('setT error:',id,e);}}return false;}
+function setV(id,show){const el=svgGet(id);if(el){try{el.setAttribute('visibility',show?'visible':'hidden');return true;}catch(e){console.warn('setV error:',id,e);}}return false;}
+```
+
+**Alasan:** 
+- Wrap dalam try-catch untuk menangkap unexpected errors
+- Log warning ke console untuk debugging
+- Return boolean untuk memungkinkan caller mengecek sukses/gagal
+
+### 10. Animation Mode Toggle Validation (MEDIUM)
+
+**Lokasi:** Lines 1903-1915  
+**Masalah:** Fungsi `setAnimMode()` tidak memvalidasi parameter `mode` dan tidak null-check DOM elements.
+
+**Kode sebelum:**
+```javascript
+function setAnimMode(mode){
+  if(!S) return;
+  // Guard: ensure SVG is initialized before switching modes
+  const svg = document.getElementById('svgPhasor');
+  if(!svg) return;
+
+  // Mark as not ready during mode switch to prevent race conditions
+  phasorReady = false;
+
+  S.animMode=mode;
+  document.getElementById('amode-phasor').classList.toggle('active',mode==='phasor');
+  document.getElementById('amode-realistic').classList.toggle('active',mode==='realistic');
+}
+```
+
+**Kode sesudah:**
+```javascript
+function setAnimMode(mode){
+  if(!S) return;
+  // Validate mode parameter
+  if(mode!=='phasor' && mode!=='realistic'){
+    console.warn('Invalid animation mode:',mode);
+    return;
+  }
+  // Guard: ensure SVG is initialized before switching modes
+  const svg = document.getElementById('svgPhasor');
+  if(!svg) return;
+
+  // Mark as not ready during mode switch to prevent race conditions
+  phasorReady = false;
+
+  S.animMode=mode;
+  const phasorBtn=document.getElementById('amode-phasor');
+  const realisticBtn=document.getElementById('amode-realistic');
+  if(phasorBtn) phasorBtn.classList.toggle('active',mode==='phasor');
+  if(realisticBtn) realisticBtn.classList.toggle('active',mode==='realistic');
+}
+```
+
+**Alasan:**
+- Validasi parameter mencegah invalid state
+- Null check sebelum classList.toggle mencegah crash jika element tidak ditemukan
+- Console warning membantu debugging
+
+### Testing Setelah Fix
+
+Semua 113 tests passing:
+```bash
+node tools/model.test.js        # 17/17 PASS
+node tools/ui.test.js            # 79/79 PASS
+node tools/chart-scale.test.js   # 17/17 PASS
+```
+
+### Summary of All Fixes
+
+| # | Bug | Priority | Status |
+|---|-----|----------|--------|
+| 1 | Governor TGOV1 model | FATAL | ✅ DONE (commit sebelumnya) |
+| 2 | Grid frequency calculation | HIGH | ✅ DONE (commit sebelumnya) |
+| 3 | Input validation helpers | HIGH | ✅ DONE |
+| 4 | Division by zero guards | HIGH | ✅ DONE |
+| 5 | Bounded history array | HIGH | ✅ DONE |
+| 6 | SRI integrity checks | HIGH | ✅ DONE |
+| 7 | Global error handler | HIGH | ✅ DONE |
+| 8 | Null check `initSvgRealistic()` | MEDIUM | ✅ DONE |
+| 9 | Defensive `setA/T/V` helpers | MEDIUM | ✅ DONE |
+| 10 | Animation mode validation | MEDIUM | ✅ DONE |
+| - | Update PRD Chart.js | MEDIUM | ⏳ PENDING |
