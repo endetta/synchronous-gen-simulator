@@ -1481,11 +1481,12 @@ function initTimeCharts(){
   if(oldContainer)oldContainer.remove();
 
   // Create container for 4 stacked charts with flexbox
+  // Layout: 3 charts di atas (tanpa x-axis), 1 chart di bawah (dengan x-axis)
   const container=document.createElement('div');
   container.setAttribute('data-chart-container','true');
   container.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;gap:2px;padding:6px;background:#f4f6fb;pointer-events:auto;';
 
-  // Create chart wrappers with aspect ratio control + overflow:hidden to prevent Chart.js from affecting scroll
+  // Create chart wrappers - bottom chart will have x-axis
   for(let i=0;i<4;i++){
     const wrapper=document.createElement('div');
     wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:60px;overflow:hidden;';
@@ -1511,55 +1512,95 @@ function initTimeCharts(){
       console.warn(`Chart canvas ${i} has invalid dimensions: ${rect.width}x${rect.height}`);
     }
   });
-  const baseOpts={
+
+  // Base options dengan animation untuk smooth x-axis shift
+  const baseOptsNoX={
     responsive:false,
     maintainAspectRatio:false,
-    animation:false,
+    animation:{
+      duration:150, // Smooth transition untuk scale changes
+      easing:'easeOutQuart'
+    },
     interaction:{mode:'index',intersect:false},
-    plugins:{legend:{display:false,position:'top'},tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}},
+    plugins:{
+      legend:{display:false},
+      tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}
+    },
     scales:{
       x:{
         type:'linear',
-        display:true,
+        display:false, // HIDDEN untuk chart atas
         min:0,
-        max:30,
-        grid:{display:true,color:'#e8ecf4'},
-        ticks:{color:'#3a4465',font:{size:9},stepSize:5,padding:8},
-        border:{color:'#ccd2e0'},
-        title:{display:true,text:'Time (s)',color:'#3a4465',padding:10}
+        max:30
       },
       y:{
         display:true,
-        grid:{color:'#e8ecf4'},
-        ticks:{color:'#3a4465',font:{size:9},padding:6},
+        grid:{color:'#e8ecf4',lineWidth:0.5},
+        ticks:{color:'#3a4465',font:{size:9},padding:4},
         border:{color:'#ccd2e0'}
       }
     },
     elements:{point:{radius:0,hoverRadius:3},line:{tension:0.3,borderWidth:2}}
   };
 
+  // Bottom chart options WITH visible x-axis
+  const baseOptsWithX={
+    responsive:false,
+    maintainAspectRatio:false,
+    animation:{
+      duration:150,
+      easing:'easeOutQuart'
+    },
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{enabled:true,mode:'index',intersect:false,backdropColor:'rgba(255,255,255,0.95)'}
+    },
+    scales:{
+      x:{
+        type:'linear',
+        display:true,
+        min:0,
+        max:30,
+        grid:{display:true,color:'#e8ecf4',lineWidth:0.5},
+        ticks:{color:'#3a4465',font:{size:9},stepSize:5,padding:6},
+        border:{color:'#ccd2e0'},
+        title:{display:true,text:'Time (s)',color:'#3a4465',padding:4,font:{size:10}}
+      },
+      y:{
+        display:true,
+        grid:{color:'#e8ecf4',lineWidth:0.5},
+        ticks:{color:'#3a4465',font:{size:9},padding:4},
+        border:{color:'#ccd2e0'}
+      }
+    },
+    elements:{point:{radius:0,hoverRadius:3},line:{tension:0.3,borderWidth:2}}
+  };
+
+  // Chart 1-3: WITHOUT x-axis display (hanya garis grid vertikal saja)
   timeCharts.delta=new Chart(canvases[0],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'δ (degrees)',color:'#806000',font:{weight:'bold'}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'δ (deg)',color:'#806000',font:{weight:'bold',size:10}}}}}
   });
 
   timeCharts.omega=new Chart(canvases[1],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold'}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold',size:10}}}}}
   });
 
   timeCharts.power=new Chart(canvases[2],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold'}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold',size:10}}}}}
   });
 
+  // Chart 4 (BOTTOM): WITH x-axis display - satu-satunya yang tampil
   timeCharts.freq=new Chart(canvases[3],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold'}}}}}
+    options:{...baseOptsWithX,scales:{...baseOptsWithX.scales,y:{...baseOptsWithX.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold',size:10}}}}}
   });
 
   // Set initial canvas sizes
@@ -1575,6 +1616,80 @@ function resizeTimeCharts(){
 }
 
 let chartUpdateCounter=0;
+const CHART_UPDATE_INTERVAL=15; // Update every 15 frames (4 Hz) — sufficient for visual smoothness
+const DATA_DECIMATION=5; // Keep 1 out of every 5 points — reduces array ops by 80%
+
+/**
+ * Decimate array untuk mengurangi jumlah titik data yang dirender.
+ * Mengambil setiap titik ke-n dari array untuk performa optimal.
+ *
+ * @param {Array} arr - Array input
+ * @param {number} factor - Faktor decimation (ambil setiap titik ke-factor)
+ * @returns {Array} Array yang sudah di-decimate
+ */
+function decimateArray(arr,factor){
+  if(factor<=1||arr.length<factor*2)return arr;
+  const result=[];
+  for(let i=0;i<arr.length;i+=factor){
+    result.push(arr[i]);
+  }
+  // Always include last point for continuity
+  if(arr.length>0&&result[result.length-1]!==arr[arr.length-1]){
+    result.push(arr[arr.length-1]);
+  }
+  return result;
+}
+
+/**
+ * Optimized batch data extraction — single pass through history.
+ * Menghindari multiple .map() calls yang mahal.
+ *
+ * @param {Array} hist - History array
+ * @returns {Object} Semua dataset yang diperlukan dalam single pass
+ */
+function extractChartData(hist){
+  const deltaData=[];
+  const omegaData=[];
+  const peData=[];
+  const pmData=[];
+  const fData=[];
+  const fnomData=[];
+  const peValues=[];
+  const pmValues=[];
+  const ddegValues=[];
+  const omegaValues=[];
+  const fValues=[];
+
+  for(let i=0;i<hist.length;i++){
+    const d=hist[i];
+    deltaData.push({x:d.t,y:d.ddeg});
+    omegaData.push({x:d.t,y:d.omega});
+    peData.push({x:d.t,y:d.Pe});
+    pmData.push({x:d.t,y:d.Pm});
+    fData.push({x:d.t,y:d.f});
+    fnomData.push({x:d.t,y:F0});
+    peValues.push(d.Pe);
+    pmValues.push(d.Pm);
+    ddegValues.push(d.ddeg);
+    omegaValues.push(d.omega);
+    fValues.push(d.f);
+  }
+
+  return{
+    delta:deltaData,
+    omega:omegaData,
+    pe:peData,
+    pm:pmData,
+    f:fData,
+    fnom:fnomData,
+    peValues,
+    pmValues,
+    ddegValues,
+    omegaValues,
+    fValues
+  };
+}
+
 function updateTimeCharts(){
   const hist=S.hist;
   if(hist.length<2||Object.keys(timeCharts).length===0)return;
@@ -1582,35 +1697,38 @@ function updateTimeCharts(){
   // Skip chart updates if user is scrolling to prevent autoscroll
   if(isUserScrolling)return;
 
-  // Throttle chart updates to every 5 frames to reduce layout thrashing
+  // Throttle chart updates to every N frames for performance
+  // 15 frames = 4 Hz updates (still visually smooth)
   chartUpdateCounter++;
-  if(chartUpdateCounter<5)return;
+  if(chartUpdateCounter<CHART_UPDATE_INTERVAL)return;
   chartUpdateCounter=0;
 
   const te=hist[hist.length-1].t;
   const ts=Math.max(0,te-HWIN);
-  const data=hist.filter(d=>d.t>=ts&&d.t<=te);
+
+  // Filter to time window, then decimate
+  const windowData=hist.filter(d=>d.t>=ts&&d.t<=te);
+  const data=decimateArray(windowData,DATA_DECIMATION);
 
   // Calculate X-axis range with sliding window
-  // xMin=0 until t=30s, then slides to maintain 30s window
-  // xMax always follows current time
   const xMin=ts;
   const xMax=te;
 
+  // Single-pass data extraction (replaces 8 separate .map() calls)
+  const chartData=extractChartData(data);
+
   // Delta chart with stabilized scale
-  const deltaData=data.map(d=>({x:d.t,y:d.ddeg}));
-  const deltaScale=chartStabilizers.delta.update(calcYScale(data.map(d=>d.ddeg),0.1));
-  timeCharts.delta.data.datasets=[{label:'δ',data:deltaData,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)'}];
+  const deltaScale=chartStabilizers.delta.update(calcYScale(chartData.ddegValues,0.1));
+  timeCharts.delta.data.datasets=[{label:'δ',data:chartData.delta,borderColor:'#806000',backgroundColor:'rgba(128,96,0,0.05)',fill:false}];
   timeCharts.delta.options.scales.y.min=deltaScale.min;
   timeCharts.delta.options.scales.y.max=deltaScale.max;
   timeCharts.delta.options.scales.x.min=xMin;
   timeCharts.delta.options.scales.x.max=xMax;
-  timeCharts.delta.update('none');
+  timeCharts.delta.update('none'); // 'none' mode = no animation overhead
 
   // Omega chart with stabilized scale
-  const omegaData=data.map(d=>({x:d.t,y:d.omega}));
-  const omegaScale=chartStabilizers.omega.update(calcYScale(data.map(d=>d.omega),0.1));
-  timeCharts.omega.data.datasets=[{label:'Δω',data:omegaData,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)'}];
+  const omegaScale=chartStabilizers.omega.update(calcYScale(chartData.omegaValues,0.1));
+  timeCharts.omega.data.datasets=[{label:'Δω',data:chartData.omega,borderColor:'#3a6818',backgroundColor:'rgba(58,104,24,0.05)',fill:false}];
   timeCharts.omega.options.scales.y.min=omegaScale.min;
   timeCharts.omega.options.scales.y.max=omegaScale.max;
   timeCharts.omega.options.scales.x.min=xMin;
@@ -1618,12 +1736,10 @@ function updateTimeCharts(){
   timeCharts.omega.update('none');
 
   // Power chart with stabilized scale
-  const peData=data.map(d=>({x:d.t,y:d.Pe}));
-  const pmData=data.map(d=>({x:d.t,y:d.Pm}));
-  const powerScale=chartStabilizers.power.update(calcYScale([...data.map(d=>d.Pe),...data.map(d=>d.Pm)],0.1));
+  const powerScale=chartStabilizers.power.update(calcYScale([...chartData.peValues,...chartData.pmValues],0.1));
   timeCharts.power.data.datasets=[
-    {label:'Pe',data:peData,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)'},
-    {label:'Pm',data:pmData,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)'}
+    {label:'Pe',data:chartData.pe,borderColor:'#006898',backgroundColor:'rgba(0,104,152,0.05)',fill:false},
+    {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false}
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
@@ -1631,12 +1747,11 @@ function updateTimeCharts(){
   timeCharts.power.options.scales.x.max=xMax;
   timeCharts.power.update('none');
 
-  // Frequency chart with stabilized scale (centered at 50 Hz)
-  const fData=data.map(d=>({x:d.t,y:d.f}));
-  const fScale=chartStabilizers.freq.update(calcYScale(data.map(d=>d.f),0.05));
+  // Frequency chart with stabilized scale
+  const fScale=chartStabilizers.freq.update(calcYScale(chartData.fValues,0.05));
   timeCharts.freq.data.datasets=[
-    {label:'f',data:fData,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)'},
-    {label:'fnom',data:data.map(d=>({x:d.t,y:F0})),borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1}
+    {label:'f',data:chartData.f,borderColor:'#0a7040',backgroundColor:'rgba(10,112,64,0.05)',fill:false},
+    {label:'fnom',data:chartData.fnom,borderColor:'#ccd2e0',borderDash:[4,4],borderWidth:1,fill:false}
   ];
   timeCharts.freq.options.scales.y.min=fScale.min;
   timeCharts.freq.options.scales.y.max=fScale.max;
