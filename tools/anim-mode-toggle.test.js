@@ -1,74 +1,74 @@
 #!/usr/bin/env node
 /**
- * Animation Mode Toggle Bug Test
- *
- * Bug: Ketika user toggle fasor → realistis → fasor → realistis,
- * simulator freeze karena SVG ready flags tidak di-reset saat mode berubah.
- *
- * Root cause:
- * - initSvgPhasor() set phasorReady=true dan clear innerHTML
- * - initSvgRealistic() set rsReady=true dan clear innerHTML
- * - Tapi setAnimMode() TIDAK reset flag yang berlawanan
- * - Akibat: SVG structure mismatch, operasi pada null elements
+ * Regression test for repeated phasor/realistic mode switches.
  */
 
+const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
-// Navigate to correct path (file is in SHEVA'S SIMULATOR LIBRARY root, not LEVEL 1 subfolder)
-const HTML_PATH = path.join(__dirname, '..', '..', 'LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html');
+const HTML_PATH = path.join(__dirname, '..', 'LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html');
 
-function testAnimModeToggleBug() {
-  console.log('Testing Animation Mode Toggle Bug...\n');
-
-  const html = fs.readFileSync(HTML_PATH, 'utf-8');
-
-  // Extract setAnimMode function
-  const setAnimModeMatch = html.match(/function setAnimMode\(mode\)\{[\s\S]*?\n\}/);
-  if (!setAnimModeMatch) {
-    throw new Error('setAnimMode function not found');
-  }
-
-  const setAnimModeCode = setAnimModeMatch[0];
-  console.log('Current setAnimMode implementation:');
-  console.log(setAnimModeCode);
-  console.log();
-
-  // Check if it resets ready flags
-  const resetsPhasorReady = /phasorReady\s*=\s*false/.test(setAnimModeCode);
-  const resetsRsReady = /rsReady\s*=\s*false/.test(setAnimModeCode);
-
-  console.log('Bug Detection:');
-  console.log(`  - Resets phasorReady flag: ${resetsPhasorReady ? '✓' : '✗ MISSING'}`);
-  console.log(`  - Resets rsReady flag: ${resetsRsReady ? '✓' : '✗ MISSING'}`);
-  console.log();
-
-  if (!resetsPhasorReady || !resetsRsReady) {
-    console.log('❌ BUG CONFIRMED: setAnimMode() does NOT reset ready flags');
-    console.log();
-    console.log('Expected behavior:');
-    console.log('  When switching to realistic mode → phasorReady should be set to false');
-    console.log('  When switching to phasor mode → rsReady should be set to false');
-    console.log();
-    console.log('Why this causes freeze:');
-    console.log('  1. User clicks "Fasor" → phasorReady=true, SVG initialized with phasor structure');
-    console.log('  2. User clicks "Realistis" → rsReady=true, SVG innerHTML cleared & realistic structure created');
-    console.log('  3. User clicks "Fasor" again → phasorReady STILL true, NO re-init');
-    console.log('     BUT: SVG structure is still realistic (wrong structure!)');
-    console.log('  4. updateSvgPhasorClassic() tries to query phasor elements → returns NULL');
-    console.log('  5. Operations on null elements → freeze/crash');
-    console.log();
-    return false;
-  } else {
-    console.log('✓ No bug detected: ready flags are properly reset');
-    return true;
-  }
+function extractAnimModeHandler(html) {
+  const start = html.indexOf('function setAnimMode(mode){');
+  const end = html.indexOf('function updTrack(el){', start);
+  assert(start >= 0, 'setAnimMode function not found');
+  assert(end > start, 'setAnimMode end marker not found');
+  return html.slice(start, end);
 }
 
-try {
-  const passed = testAnimModeToggleBug();
-  process.exit(passed ? 0 : 1);
-} catch (err) {
-  console.error('Test error:', err.message);
-  process.exit(1);
+function createHandlerHarness(handlerCode) {
+  const context = {
+    console: { warn() {} },
+    S: { animMode: 'phasor' },
+    document: {
+      getElementById(id) {
+        if (id === 'svgPhasor') return {};
+        return { classList: { toggle() {} } };
+      },
+    },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(`
+    let phasorReady = true;
+    let realInit = true;
+    ${handlerCode}
+    globalThis.setReady = () => {
+      phasorReady = true;
+      realInit = true;
+    };
+    globalThis.readState = () => ({
+      phasorReady,
+      realInit,
+      animMode: S.animMode,
+    });
+  `, context);
+  return context;
 }
+
+function testAnimModeToggle() {
+  const html = fs.readFileSync(HTML_PATH, 'utf8');
+  const handlerCode = extractAnimModeHandler(html);
+
+  assert.match(handlerCode, /phasorReady\s*=\s*false/);
+  assert.match(handlerCode, /realInit\s*=\s*false/);
+  assert.doesNotMatch(handlerCode, /rsReady/);
+
+  const context = createHandlerHarness(handlerCode);
+  const sequence = ['phasor', 'realistic', 'phasor', 'realistic'];
+
+  for (const mode of sequence) {
+    context.setReady();
+    context.setAnimMode(mode);
+    const state = context.readState();
+    assert.strictEqual(state.phasorReady, false);
+    assert.strictEqual(state.realInit, false);
+    assert.strictEqual(state.animMode, mode);
+  }
+
+  console.log('Animation mode toggle regression test passed.');
+}
+
+testAnimModeToggle();

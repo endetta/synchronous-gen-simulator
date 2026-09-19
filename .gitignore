@@ -42,3 +42,5 @@ coverage/
 
 # Claude/AI working files
 .claude/
+
+.playwright-mcp/

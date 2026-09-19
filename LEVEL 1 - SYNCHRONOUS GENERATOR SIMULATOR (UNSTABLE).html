@@ -10,7 +10,7 @@
 
 <!-- Chart.js for Time Series (with SRI for security) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-bYKsxjqxaylGfcsbR8gpRpA4n3bKucz/Z7MqapB0Io/RiuxGVJ+808uklxP0CwN2" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha384-zPzbVRXfR492Sd5D+HydTYCxxgHAfgVO8KERbLlpeH5unsmbAEXrscGUUqLZG9BM" crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -154,6 +154,7 @@ input[type=number]:focus{border-color:var(--etap)}
     <div class="hstat"><div class="hstat-lbl">Δω Speed</div><div class="hstat-val" id="hw" style="color:var(--lime)">0.000000 pu</div></div>
     <div class="hstat"><div class="hstat-lbl">f Frequency</div><div class="hstat-val" id="hf" style="color:var(--green)">50.0000 Hz</div></div>
     <div class="hstat"><div class="hstat-lbl">Pe Output</div><div class="hstat-val" id="hp" style="color:var(--cyan)">0.0000 pu</div></div>
+    <div class="hstat"><div class="hstat-lbl">Qe Output</div><div class="hstat-val" id="hq" style="color:var(--violet)">0.0000 pu</div></div>
     <div class="hstat"><div class="hstat-lbl">Pm Input</div><div class="hstat-val" id="hm" style="color:var(--orange)">0.0000 pu</div></div>
     <div class="sc-badge" id="scbadge">FAULT</div>
   </div>
@@ -191,7 +192,7 @@ input[type=number]:focus{border-color:var(--etap)}
         <div class="drag-handle" data-pane="pane2"></div>
       </div>
       <!-- Panel 3: Canvas Time Series -->
-      <div class="vpane" id="pane3" style="height:280px">
+      <div class="vpane" id="pane3" style="height:300px">
         <div class="vlabel">III · Time Series</div>
         <canvas id="cv3"></canvas>
         <div class="drag-handle" data-pane="pane3"></div>
@@ -216,6 +217,8 @@ input[type=number]:focus{border-color:var(--etap)}
         <div class="scard" id="card-mg" style="border-left-color:var(--green)"><div class="scard-lbl">δ vs δ_critical</div><div class="scard-val" id="sc_mg" style="color:var(--green)">SAFE</div></div>
         <div class="scard" style="border-left-color:var(--cyan)"><div class="scard-lbl">Pmax (current)</div><div class="scard-val" id="sc_pmax" style="color:var(--cyan)">0.000 pu</div></div>
         <div class="scard" style="border-left-color:var(--violet)"><div class="scard-lbl">T_osc Period</div><div class="scard-val" id="sc_Tosc" style="color:var(--violet)">— s</div></div>
+        <div class="scard" style="border-left-color:#6040a0"><div class="scard-lbl">Qe Reactive Out</div><div class="scard-val" id="sc_q" style="color:#6040a0">+0.0000 pu</div></div>
+        <div class="scard" style="border-left-color:var(--green)"><div class="scard-lbl">pf / S Apparent</div><div class="scard-val" id="sc_pf" style="color:var(--green)">— / — pu</div></div>
         <div class="scard" style="border-left-color:var(--etap);grid-column:1/-1"><div class="scard-lbl">EAC Status · δ<sub>cc</sub> · t<sub>cc</sub></div><div class="scard-val" id="sc_eac" style="color:var(--txt2);font-size:12px">—</div></div>
       </div>
     </div>
@@ -479,11 +482,31 @@ function makeState(){
 // PHYSICS ENGINE  (swing equation + TGOV1 governor)
 // Ref: Kundur (1994) §11.1; Anderson & Fouad (2003) §2.4
 // ================================================================
+// Tegangan terminal. Saat SC, tegangan terminal kolaps ke V·sc_Pfact —
+// inilah yang membuat P DAN Q sama-sama jatuh saat gangguan (konsisten).
+function getVt(s){ return s.sc_active ? s.V*s.sc_Pfact : s.V; }
 function getPmax(s){
   const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
-  return s.sc_active ? s.Ef*s.V/Xs_safe*s.sc_Pfact : s.Ef*s.V/Xs_safe;
+  return s.Ef*getVt(s)/Xs_safe;
 }
 function getPe(s)  { return getPmax(s)*Math.sin(s.delta); }
+// Daya reaktif di sisi terima (Kundur 1994 §11.1):
+//   Q = Vt·(E'·cos δ − Vt) / X'd
+// Tanda: Q>0 lagging (overexcited), Q<0 leading (underexcited), Q=0 unity pf.
+function getQe(s)  {
+  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
+  const Vt=getVt(s);
+  return Vt*(s.Ef*Math.cos(s.delta)-Vt)/Xs_safe;
+}
+// Daya semu & faktor daya di sisi terminal.
+// pf = |P|/S (magnitudo, selalu 0..1); sifat lag/lead dibaca dari tanda Q.
+// Saat generator motoring sesaat (δ<0, P<0) arah daya sudah terlihat di readout P.
+function getS(s)   { return Math.hypot(getPe(s),getQe(s)); }
+function getPF(s)  { const S=getS(s); return S>1e-9?Math.min(1,Math.abs(getPe(s))/S):1; }
+function getPFNature(s){
+  const Q=getQe(s);
+  return Math.abs(Q)<1e-4?'unity':(Q>0?'lag':'lead');
+}
 
 function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
   const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
@@ -573,10 +596,11 @@ function stepPhys(s,rdt){
 
   if(s.t-s.hlast>=HSTEP){
     const Pe=getPe(s);
+    const Qe=getQe(s);
     const Pm_eff=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
     const f=s.mode==='grid'?F0:F0*(1+s.omega);
     // Keep 30 seconds of history at 60 Hz = 1800 points (was 900 at 25 Hz)
-    pushHistory(s.hist,{t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Pm:Pm_eff,f,sc:s.sc_active},1800);
+    pushHistory(s.hist,{t:s.t,ddeg:s.delta*R2D,omega:s.omega,Pe,Qe,Pm:Pm_eff,f,sc:s.sc_active},1800);
     s.hlast=s.t;
     autoNarr(s); updateCards(s);
     if(rlr_running)updateRLRDisplay(s);
@@ -646,6 +670,13 @@ function updateCards(s){
   else if(margin<20){mEl.innerHTML=margin.toFixed(1)+'° ⚠';mEl.style.color='var(--amber,#b07000)';mc.style.borderLeftColor='var(--amber,#b07000)';}
   else{mEl.innerHTML=margin.toFixed(1)+'° safe';mEl.style.color='var(--green)';mc.style.borderLeftColor='var(--green)';}
   document.getElementById('sc_pmax').textContent=Pmax.toFixed(4)+' pu';
+  const Qe=getQe(s), S=getS(s), pf=getPF(s), pfNat=getPFNature(s);
+  const qEl=document.getElementById('sc_q');
+  qEl.textContent=(Qe>=0?'+':'')+Qe.toFixed(4)+' pu';
+  qEl.style.color=Math.abs(Qe)<1e-4?'var(--txt2)':(Qe>0?'#6040a0':'var(--cyan)');
+  const pfEl=document.getElementById('sc_pf');
+  pfEl.textContent=pf.toFixed(3)+' '+pfNat+' / '+S.toFixed(4)+' pu';
+  pfEl.style.color=pfNat==='lag'?'var(--green)':(pfNat==='lead'?'var(--amber,#b07000)':'var(--txt2)');
   const Ks=Pmax*Math.cos(Math.abs(s.delta));
   document.getElementById('sc_Tosc').textContent=Ks>0.01?(2*Math.PI*Math.sqrt(2*s.H/(WS*Ks))).toFixed(3)+' s':'—';
   const dcc=getCC(s),tcc=getCCT(s),eacEl=document.getElementById('sc_eac');
@@ -668,6 +699,10 @@ function updateHdr(){
   document.getElementById('hw').textContent=S.omega.toFixed(6)+' pu';
   document.getElementById('hf').textContent=f.toFixed(4)+' Hz';
   document.getElementById('hp').textContent=Pe.toFixed(4)+' pu';
+  const Qe=getQe(S);
+  const hqEl=document.getElementById('hq');
+  hqEl.textContent=(Qe>=0?'+':'')+Qe.toFixed(4)+' pu';
+  hqEl.style.color=Math.abs(Qe)<1e-4?'var(--txt2)':(Qe>0?'var(--violet)':'var(--cyan)');
   document.getElementById('hm').textContent=Pm_eff.toFixed(4)+' pu';
   document.getElementById('scbadge').classList.toggle('on',S.sc_active);
 }
@@ -709,6 +744,8 @@ function safeSetAttr(element, attrs) {
 
 function initSvgPhasor(svg){
   svg.innerHTML='';
+  dpLeftCache=null;
+  dpRightCache=null;
   // Background gradient
   const defs=mkSvg('defs');
   const rg=mkSvg('radialGradient',{id:'ph-bg',cx:'50%',cy:'50%',r:'50%'});
@@ -1333,7 +1370,7 @@ function updateSvgPdelta(){
     initSvgPdelta(svg,w,h);
   }
 
-  const ml=58,mr=18,mt=24,mb=32;
+  const ml=58,mr=18,mt=30,mb=52;
   const pw=w-ml-mr,ph=h-mt-mb;
   const Pmax=S.Ef*S.V/S.Xs,Pm_eff=Math.min(Math.max(S.Pm+S.Pm_gov,0),3.5);
   const Pmax_f=Pmax*S.sc_Pfact;
@@ -1405,7 +1442,7 @@ function updateSvgPdelta(){
   if(d_cc&&d_cc>d_s+0.05&&d_cc<d_cr-0.05){
     setV('pd-dcc',true);setV('pd-dcc-t',true);setV('pd-h-dcc',true);
     setA('pd-dcc',{x1:sx(d_cc),y1:f2(mt),x2:sx(d_cc),y2:f2(mt+ph)});
-    setA('pd-dcc-t',{x:sx(d_cc),y:f2(mt+ph+mb-8)}); setT('pd-dcc-t','δ_cc='+(d_cc*R2D).toFixed(1)+'°');
+    setA('pd-dcc-t',{x:sx(d_cc),y:f2(mt+ph+28)}); setT('pd-dcc-t','δ_cc='+(d_cc*R2D).toFixed(1)+'°');
     setA('pd-h-dcc',{x:f2(parseFloat(sx(d_cc))-12),y:f2(mt),width:'24',height:f2(ph)});
   }else{setV('pd-dcc',false);setV('pd-dcc-t',false);setV('pd-h-dcc',false);}
 
@@ -1464,7 +1501,7 @@ function updateSvgPdelta(){
   // Axes
   setA('pd-ax',{x1:f2(ml),y1:f2(mt+ph),x2:f2(ml+pw),y2:f2(mt+ph)});
   setA('pd-ay',{x1:f2(ml),y1:f2(mt),x2:f2(ml),y2:f2(mt+ph)});
-  setA('pd-xl-lbl',{x:f2(ml+pw/2),y:f2(mt+ph+28)});
+  setA('pd-xl-lbl',{x:f2(ml+pw/2),y:f2(mt+ph+42)});
   setA('pd-yl-lbl',{x:'13',y:f2(mt+ph/2),transform:'rotate(-90 13 '+(mt+ph/2)+')'});
 }
 
@@ -1579,7 +1616,7 @@ function initTimeCharts(){
   // Layout: 3 charts di atas (tanpa x-axis), 1 chart di bawah (dengan x-axis)
   const container=document.createElement('div');
   container.setAttribute('data-chart-container','true');
-  container.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;gap:2px;padding:6px;background:#f4f6fb;pointer-events:auto;';
+  container.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;gap:2px;padding:24px 6px 6px;background:#f4f6fb;pointer-events:auto;';
 
   // Create chart wrappers - bottom chart will have x-axis
   for(let i=0;i<4;i++){
@@ -1682,19 +1719,19 @@ function initTimeCharts(){
   timeCharts.delta=new Chart(canvases[0],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,min:0,max:90,ticks:{...baseOptsNoX.scales.y.ticks,stepSize:15},title:{display:true,text:'δ (deg)',color:'#806000',font:{weight:'bold',size:13}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,afterFit:applySharedYWidth,min:0,max:90,ticks:{...baseOptsNoX.scales.y.ticks,stepSize:15},title:{display:true,text:'δ (deg)',color:'#806000',font:{weight:'bold',size:13}}}}}
   });
 
   timeCharts.omega=new Chart(canvases[1],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold',size:13}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,afterFit:applySharedYWidth,title:{display:true,text:'Δω (pu)',color:'#3a6818',font:{weight:'bold',size:13}}}}}
   });
 
   timeCharts.power=new Chart(canvases[2],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,title:{display:true,text:'P (pu)',color:'#006898',font:{weight:'bold',size:13}}}}}
+    options:{...baseOptsNoX,scales:{...baseOptsNoX.scales,y:{...baseOptsNoX.scales.y,afterFit:applySharedYWidth,title:{display:true,text:'P, Q (pu)',color:'#006898',font:{weight:'bold',size:13}}}}}
   });
 
   // Chart 4 (BOTTOM): WITH x-axis display - satu-satunya yang tampil
@@ -1702,7 +1739,7 @@ function initTimeCharts(){
   timeCharts.freq=new Chart(canvases[3],{
     type:'line',
     data:{datasets:[]},
-    options:{...baseOptsWithX,scales:{...baseOptsWithX.scales,y:{...baseOptsWithX.scales.y,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold',size:13}}}}}
+    options:{...baseOptsWithX,scales:{...baseOptsWithX.scales,y:{...baseOptsWithX.scales.y,afterFit:applySharedYWidth,title:{display:true,text:'f (Hz)',color:'#0a7040',font:{weight:'bold',size:13}}}}}
   });
 
   // Set initial canvas sizes
@@ -1717,9 +1754,32 @@ function resizeTimeCharts(){
   return;
 }
 
-let chartUpdateCounter=0;
-const CHART_UPDATE_INTERVAL=5; // Update every 5 frames (12 Hz) — balanced smoothness vs performance
-const MAX_CHART_POINTS=600; // Maximum points to render (10 seconds at 60 Hz)
+let lastChartCommit=0;
+const CHART_COMMIT_INTERVAL=0.033; // Commit setiap ~33 ms (30 Hz) berbasis waktu simulasi
+const MAX_CHART_POINTS=600; // Maximum points to render
+const DECIMATE_BUCKET=0.05; // Grid waktu tetap 50 ms — vertex tidak re-phase antar commit
+
+// Satu kontrak lebar Y-axis untuk keempat chart: hitung lebar intrinsik
+// maksimum dari keempat scale lalu pin semuanya agar plot origin sejajar.
+// Pin satu konstanta lebar Y-axis untuk keempat chart agar plot origin sejajar.
+// Bukan running max: Chart.js mempertahankan scale.width antar update, sehingga
+// running max menyebabkan feedback loop dan lebar membengkak tak terbatas.
+let sharedYWidth=0;
+function applySharedYWidth(scale){
+  if(sharedYWidth>0)scale.width=sharedYWidth;
+}
+function pinSharedYWidthOnce(){
+  if(sharedYWidth>0)return;
+  let maxIntrinsic=0;
+  for(const k in timeCharts){
+    const c=timeCharts[k];
+    if(c&&c.scales&&c.scales.y)maxIntrinsic=Math.max(maxIntrinsic,c.scales.y.width);
+  }
+  if(maxIntrinsic<=0)return;
+  // Margin 15% untuk label tick terpanjang saat fault; konstanta tidak pernah berubah
+  sharedYWidth=Math.ceil(maxIntrinsic*1.15/2)*2;
+  for(const k in timeCharts){ if(timeCharts[k])timeCharts[k].update('none'); }
+}
 
 /**
  * Smart decimation untuk rendering.
@@ -1729,23 +1789,37 @@ const MAX_CHART_POINTS=600; // Maximum points to render (10 seconds at 60 Hz)
  * @param {number} maxPoints - Maksimum titik yang akan dirender
  * @returns {Array} Array yang sudah di-decimate
  */
-function smartDecimate(arr, maxPoints) {
+function smartDecimate(arr, maxPoints, bucketMs = DECIMATE_BUCKET) {
   if (arr.length <= maxPoints) return arr;
 
+  // Grid waktu tetap: pilih satu titik per bucket 50 ms. Karena grid absolut
+  // (bukan relatif ke panjang window), vertex tidak bergeser fase saat commit.
+  const bucket = bucketMs;
   const result = [];
-  const step = arr.length / maxPoints;
+  let lastBucket = -1;
 
-  // Always include first point
-  result.push(arr[0]);
-
-  // Sample points evenly
-  for (let i = 1; i < maxPoints - 1; i++) {
-    const idx = Math.floor(i * step);
-    result.push(arr[idx]);
+  for (let i = 0; i < arr.length; i++) {
+    const b = Math.floor(arr[i].x / bucket);
+    if (b !== lastBucket) {
+      result.push(arr[i]);
+      lastBucket = b;
+    }
   }
 
-  // Always include last point
-  result.push(arr[arr.length - 1]);
+  // Pastikan titik terakhir selalu ada untuk kontinuitas ujung kanan
+  const last = arr[arr.length - 1];
+  if (result.length === 0 || result[result.length - 1].x !== last.x) {
+    result.push(last);
+  }
+
+  // Batas keras titik: jarang terpicu (grid 50 ms atas window 30 s = ~600 titik)
+  if (result.length > maxPoints) {
+    const thinned = [];
+    const step = result.length / maxPoints;
+    for (let i = 0; i < maxPoints - 1; i++) thinned.push(result[Math.floor(i * step)]);
+    thinned.push(result[result.length - 1]);
+    return thinned;
+  }
 
   return result;
 }
@@ -1762,10 +1836,12 @@ function extractChartData(hist){
   const omegaData=[];
   const peData=[];
   const pmData=[];
+  const qeData=[];
   const fData=[];
   const fnomData=[];
   const peValues=[];
   const pmValues=[];
+  const qValues=[];
   const ddegValues=[];
   const omegaValues=[];
   const fValues=[];
@@ -1776,10 +1852,12 @@ function extractChartData(hist){
     omegaData.push({x:d.t,y:d.omega});
     peData.push({x:d.t,y:d.Pe});
     pmData.push({x:d.t,y:d.Pm});
+    qeData.push({x:d.t,y:d.Qe});
     fData.push({x:d.t,y:d.f});
     fnomData.push({x:d.t,y:F0});
     peValues.push(d.Pe);
     pmValues.push(d.Pm);
+    qValues.push(d.Qe);
     ddegValues.push(d.ddeg);
     omegaValues.push(d.omega);
     fValues.push(d.f);
@@ -1790,10 +1868,12 @@ function extractChartData(hist){
     omega:omegaData,
     pe:peData,
     pm:pmData,
+    qe:qeData,
     f:fData,
     fnom:fnomData,
     peValues,
     pmValues,
+    qValues,
     ddegValues,
     omegaValues,
     fValues
@@ -1807,12 +1887,11 @@ function updateTimeCharts(){
   // Skip chart updates if user is scrolling to prevent autoscroll
   if(isUserScrolling)return;
 
-  // Throttle chart updates untuk performa (12 Hz = smooth tapi tidak berat)
-  chartUpdateCounter++;
-  if(chartUpdateCounter<CHART_UPDATE_INTERVAL)return;
-  chartUpdateCounter=0;
-
+  // Commit berbasis waktu simulasi (bukan jumlah frame) agar cadence stabil
+  // meski frame rate browser berubah-ubah.
   const te=hist[hist.length-1].t;
+  if(te-lastChartCommit<CHART_COMMIT_INTERVAL)return;
+  lastChartCommit=te;
   const ts=Math.max(0,te-HWIN);
 
   // Filter to time window
@@ -2018,10 +2097,11 @@ function updateTimeCharts(){
     borderWidth: 1.5
   };
 
-  const powerScale=chartStabilizers.power.update(calcYScale([...chartData.peValues,...chartData.pmValues],0.1));
+  const powerScale=chartStabilizers.power.update(calcYScale([...chartData.peValues,...chartData.pmValues,...chartData.qValues],0.1));
   timeCharts.power.data.datasets=[
     {label:'Pe',data:chartData.pe,borderColor:peColor,backgroundColor:'rgba(0,104,152,0.05)',fill:false,tension:0.2},
-    {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false,tension:0.2}
+    {label:'Pm',data:chartData.pm,borderColor:'#b85800',backgroundColor:'rgba(184,88,0,0.05)',fill:false,tension:0.2},
+    {label:'Qe',data:chartData.qe,borderColor:'#6040a0',backgroundColor:'rgba(96,64,160,0.05)',fill:false,tension:0.2}
   ];
   timeCharts.power.options.scales.y.min=powerScale.min;
   timeCharts.power.options.scales.y.max=powerScale.max;
@@ -2091,6 +2171,10 @@ function updateTimeCharts(){
   timeCharts.freq.options.plugins.annotation = { annotations: freqAnnotations };
 
   timeCharts.freq.update('none');
+
+  // Pin lebar Y sekali saja setelah commit pertama, saat lebar intrinsik
+  // keempat chart sudah terukur dengan label realistis.
+  pinSharedYWidthOnce();
 }
 
 function drawTime(){
@@ -2157,8 +2241,9 @@ function setAnimMode(mode){
   const svg = document.getElementById('svgPhasor');
   if(!svg) return;
 
-  // Mark as not ready during mode switch to prevent race conditions
+  // Invalidate both SVG structures because each mode replaces the shared SVG contents
   phasorReady = false;
+  realInit = false;
 
   S.animMode=mode;
   const phasorBtn=document.getElementById('amode-phasor');
@@ -2197,7 +2282,7 @@ function doReset(full=true){
   document.getElementById('bGrid').classList.add('on');
   document.getElementById('bIsland').classList.remove('on');
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
-  phasorReady=false; pdInit=false;
+  phasorReady=false; pdInit=false; lastChartCommit=0;
   // Reset chart scales on reset
   Object.values(chartStabilizers).forEach(s=>s.reset());
   if(full)setNarr('Simulasi direset ke kondisi setimbang awal.');
@@ -2240,15 +2325,24 @@ function initDragHandles(){
     const nH=Math.max(120,sh+(e.clientY-sy));
     drag.style.height=nH+'px';
     // Lock scroll position during drag to prevent autoscroll
-    if(vizScroll)vizScroll.scrollTop=lockedScrollTop;
+    // Only update if user is NOT actively scrolling
+    if(vizScroll && !isUserScrolling){
+      vizScroll.scrollTop=lockedScrollTop;
+    }
     e.preventDefault();
   });
   document.addEventListener('mouseup',()=>{
     drag=null;
-    // Keep scroll locked briefly after mouseup
-    if(vizScroll){
+    // Only restore scroll if user wasn't scrolling
+    // This prevents forcing scroll back during/after user scroll
+    if(vizScroll && !isUserScrolling){
       const finalScroll=lockedScrollTop;
-      setTimeout(()=>{vizScroll.scrollTop=finalScroll;},50);
+      setTimeout(()=>{
+        // Double-check that user still isn't scrolling
+        if(!isUserScrolling){
+          vizScroll.scrollTop=finalScroll;
+        }
+      },50);
     }
   });
 }
@@ -2455,7 +2549,7 @@ function runSc(name){
   doReset(false);sc.init(S);
   const Pmax=S.Ef*S.V/S.Xs;
   S.delta=Math.asin(Math.min(Math.max(S.Pm/Pmax,-.9999),.9999));
-  S.omega=0;S.Xg=0;S.Pm_gov=0;S.t=0;S.hist=[];S.hlast=-1e9;
+  S.omega=0;S.Xg=0;S.Pm_gov=0;S.t=0;S.hist=[];S.hlast=-1e9;lastChartCommit=0;
   S.eac_phase='none';S.A1_num=0;S.A2_num=0;
   S.evts=sc.evts.map(e=>({...e}));S.ev_t0=0;
   phasorReady=false;pdInit=false;
