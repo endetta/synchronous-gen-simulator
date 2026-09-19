@@ -103,6 +103,37 @@ Diminta user lewat brainstorming → desain disetujui → implementasi TDD.
 
 ---
 
+### 4. Verifikasi visual manual (Chrome DevTools MCP)
+
+**Apa yang dilakukan:**
+- Membuka simulator di browser sungguhan (bukan headless `tools/shoot.js`)
+- Screenshot full-page → `tools/shots/verify-q/01-default-full.png`
+- Inspeksi DOM terprogram: nilai semua readout, overflow header, dataset grafik, error konsol
+
+**Hasil — semua cocok dengan nilai acuan:**
+
+| Yang diperiksa | Hasil |
+|---|---|
+| Header `Qe Output` | `+0.1271 pu` ✓ (acuan: 0.127135) |
+| Kartu `Qe Reactive Out` | `+0.1271 pu` ✓ |
+| Kartu `pf / S Apparent` | `0.988 lag / 0.8100 pu` ✓ |
+| Header overflow @1280px | `scrollWidth 1280 = clientWidth` → **tidak overflow** |
+| Jumlah stat header | 6 (sesuai keputusan desain) |
+| Dataset grafik daya | `["Pe","Pm","Qe"]` ✓ |
+| Sumbu Y grafik daya | `P, Q (pu)` ✓ |
+| Error konsol | **nol** (hanya warning `file:` origin bawaan browser) |
+| Saat gangguan (live) | `Pe=0.0105`, `Qe=0.0453` → P dan Q **kolaps bersama** ✓ |
+| Preset Overexcitation (live) | Ef=1.0 → `lead`; Ef=1.5/2.0 → `lag` ✓ |
+
+- Tampilan terkonfirmasi: 6 stat header, panel data fasor kanan bertambah baris
+  `Qe React. Out` + `pf Power Factor`, kartu status baru, grafik daya 3 seri
+
+**Kendala:**
+- `tools/shoot.js` tidak dipakai — Chrome headless bermasalah (catatan lama di CLAUDE.md).
+  Diganti Chrome DevTools MCP yang mengemudikan Chrome sungguhan; hasil lebih dapat dipercaya.
+
+---
+
 ## Status Plan Terkait
 
 **Plan:** tidak ada (jalur bounded — desain di chat, tanpa file plan)
@@ -137,8 +168,8 @@ git commit -m "refactor(phasor): hoist perhitungan Q/pf keluar dari rdata"
 
 ## Langkah Berikutnya
 
-1. **Verifikasi visual manual di browser** — `tools/shoot.js` bermasalah (Chrome headless),
-   jadi keindahan tampilan kartu `sc_q`/`sc_pf` dan garis Qe di grafik belum diperiksa mata
+1. ~~Verifikasi visual manual di browser~~ — **SELESAI** (§4); screenshot tersimpan di
+   `tools/shots/verify-q/01-default-full.png`
 2. Pertimbangkan kurva kapabilitas P–Q (ditawarkan saat brainstorming, ditunda user) —
    Q sekarang sudah ada sebagai fondasinya
 3. Preset lain (`sc_success`, `sc_fail`, `load_step`, `grid_island`) belum menyebut Q —
