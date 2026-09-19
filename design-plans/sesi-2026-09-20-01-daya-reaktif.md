@@ -77,6 +77,32 @@ Diminta user lewat brainstorming → desain disetujui → implementasi TDD.
 
 ---
 
+### 3. Narasi preset Overexcitation (lanjutan)
+
+**Apa yang dilakukan:**
+- Menghitung Q tiap tahap preset, memverifikasi terhadap model live di browser
+- Menulis ulang ketiga narasi `SCENARIOS.overexcitation` agar menyebut Q/pf
+- Tes `Test 10`: mengunci keberadaan narasi + memverifikasi nilai Q tiap tahap
+
+**Hasil:**
+- Preset kini mengungkap temuan: dimulai dari **underexcited** lalu berayun ke
+  overexcited berat
+
+| Tahap | Q | pf | Sifat |
+|---|---|---|---|
+| Ef=1.0 | −0.255 pu | 0.920 | **leading** (menyerap reaktif) |
+| Ef=1.5 | +0.263 pu | 0.916 | lagging (berbalik menyuplai) |
+| Ef=2.0 | +0.722 pu | 0.639 | lagging (overexcited berat) |
+
+- Verifikasi browser: narasi tampil di `#narrtxt`, nilai cocok persis dengan model live
+- `tools/reactive-power.test.js` → **55 tes**
+
+**Kendala:**
+- Dua kali regex pengambil narasi salah (greedy `[^}]` berhenti di `fn(s){...}`; filter
+  `Ef=` tidak menangkap `Ef→`). Ketahuan karena tes gagal — bukan karena inspeksi manual.
+
+---
+
 ## Status Plan Terkait
 
 **Plan:** tidak ada (jalur bounded — desain di chat, tanpa file plan)
@@ -105,7 +131,7 @@ git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html"
 git commit -m "refactor(phasor): hoist perhitungan Q/pf keluar dari rdata"
 ```
 
-**Commit hash:** `309a8a9` (disapu sesi paralel) + sisa refactor belum ter-commit
+**Commit hash:** `309a8a9` (disapu sesi paralel) · `bb43397` (refactor hoisting + log sesi) · `51f98e5` (narasi preset)
 
 ---
 
@@ -113,11 +139,10 @@ git commit -m "refactor(phasor): hoist perhitungan Q/pf keluar dari rdata"
 
 1. **Verifikasi visual manual di browser** — `tools/shoot.js` bermasalah (Chrome headless),
    jadi keindahan tampilan kartu `sc_q`/`sc_pf` dan garis Qe di grafik belum diperiksa mata
-2. **Narasi preset Overexcitation belum diperbarui** — sekarang terbukti preset itu
-   **mulai dari underexcited (Q=−0.255, pf 0.920 lead)** lalu berayun ke overexcited berat
-   (Q=+0.722, pf 0.639 lag). Narasi `evts` di `SCENARIOS.overexcitation` masih tidak
-   menyebut Q sama sekali — nilai edukasi besar yang belum dipakai
-3. Pertimbangkan kurva kapabilitas P–Q (ditawarkan saat brainstorming, ditunda user)
+2. Pertimbangkan kurva kapabilitas P–Q (ditawarkan saat brainstorming, ditunda user) —
+   Q sekarang sudah ada sebagai fondasinya
+3. Preset lain (`sc_success`, `sc_fail`, `load_step`, `grid_island`) belum menyebut Q —
+   saat gangguan Q ikut kolaps, itu justru pelajaran bagus
 
 ---
 
