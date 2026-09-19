@@ -1042,10 +1042,13 @@ function updateSvgPhasor(){
     {l:"X'd Reactance",  v:S.Xs.toFixed(3)+' pu',        c:'#505878'},
     {l:'Pmax E·V/Xd',   v:Pmax.toFixed(4)+' pu',        c:'#006898'},
   ];
+  const Qe=getQe(S), pf=getPF(S), pfNat=getPFNature(S);
   const rdata=[
     {l:'Δω Speed Dev.',  v:(S.omega>=0?'+':'')+S.omega.toFixed(6)+' pu',           c:'#3a6818'},
     {l:'f Frequency',   v:fD.toFixed(4)+' Hz',                                     c:'#0a7040'},
     {l:'Pe Elec. Out',  v:Pe.toFixed(4)+' pu',                                     c:'#006898'},
+    {l:'Qe React. Out', v:(Qe>=0?'+':'')+Qe.toFixed(4)+' pu',                      c:Qe>=0?'#6040a0':'#006898'},
+    {l:'pf Power Factor',v:pf.toFixed(3)+' '+pfNat,                                c:pfNat==='lag'?'#0a7040':'#b07000'},
     {l:'Pm Mech. In',   v:Pm_eff.toFixed(4)+' pu',                                 c:'#b85800'},
     {l:'ΔP Net Accel.', v:((Pm_eff-Pe)>=0?'+':'')+(Pm_eff-Pe).toFixed(4)+' pu',   c:Math.abs(Pm_eff-Pe)<0.01?'#0a7040':Pm_eff>Pe?'#c42000':'#006898'},
     {l:'T_osc Period',  v:Tosc?Tosc.toFixed(3)+' s':'— s',                         c:'#6040a0'},
