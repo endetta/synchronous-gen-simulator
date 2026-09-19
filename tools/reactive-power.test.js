@@ -305,6 +305,37 @@ assert(html.includes("getElementById('sc_pf')"), 'updateCards menulis ke #sc_pf'
 assert(/label:'Qe'/.test(html), 'Dataset Qe terpasang di grafik daya');
 assert(/qValues/.test(html), 'Skala grafik menyertakan qValues');
 
+// ================================================================
+// Slice 6: Narasi preset Overexcitation menyebut Q
+// ================================================================
+console.log('\nTest 10: Narasi preset Overexcitation mengungkap Q');
+const narasi = [...html.matchAll(/\bn:(["'])((?:(?!\1).)*)\1/g)].map((m) => m[2]);
+const narasiOverexc = narasi.filter((n) => /Ef[=→]/.test(n));
+
+assert(narasiOverexc.length >= 3, `Ada >=3 narasi preset Overexcitation (ditemukan ${narasiOverexc.length})`);
+assert(narasiOverexc.some((n) => /lead|leading/i.test(n)),
+  'Narasi awal menyebut kondisi LEADING (underexcited) — temuan baru dari fitur Q');
+assert(narasiOverexc.some((n) => /Q\s*[=−+]/.test(n) || /\bQ\b.*pu/i.test(n)),
+  'Narasi menyebut nilai Q');
+
+// Nilai Q tiap tahap preset harus cocok dengan model
+try {
+  const M = buildFromHtml(['getVt', 'getPmax', 'getPe', 'getQe', 'getS', 'getPF', 'getPFNature']);
+  const tahap = [
+    { Ef: 1.0, delta: 0.803802318933, Q: -0.2550, nat: 'lead' },
+    { Ef: 1.5, delta: 0.500654712405, Q: 0.2633, nat: 'lag' },
+    { Ef: 2.0, delta: 0.368267893437, Q: 0.7216, nat: 'lag' },
+  ];
+  tahap.forEach(({ Ef, delta, Q, nat }) => {
+    const s = makeState({ Ef, delta, Pm: 0.6 });
+    assertClose(M.getQe(s), Q, 5e-5, `Preset Ef=${Ef}: Q=${Q} pu`);
+    assert(M.getPFNature(s) === nat, `Preset Ef=${Ef}: sifat ${nat}`);
+  });
+} catch (e) {
+  failCount++;
+  console.log(`  ✗ Nilai Q tahap preset dapat diverifikasi — ${e.message}`);
+}
+
 // Summary
 console.log('\n=== Test Summary ===');
 console.log(`Passed: ${passCount}`);

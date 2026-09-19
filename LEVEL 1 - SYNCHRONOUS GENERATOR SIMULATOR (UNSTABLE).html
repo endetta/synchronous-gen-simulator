@@ -2542,9 +2542,9 @@ const SCENARIOS={
   overexcitation:{
     init(s){s.Pm=0.6;s.Ef=1.0;s.H=8;uiSl('Pm','0.6');uiSl('Ef','1.0');setMode('grid');},
     evts:[
-      {t:1.5,n:"Ef=1.0 pu. Pmax=0.833 pu. δ₀=46°. Margin ke δ_cr=87°."},
-      {t:4,fn(s){s.Ef=1.5;uiSl('Ef','1.5');},n:'Ef→1.5 pu. Pmax=1.25 pu. Kurva P-δ naik! δ₀=29°. Margin=124°.'},
-      {t:12,fn(s){s.Ef=2.0;uiSl('Ef','2.0');},n:'Ef=2.0 pu. Pmax=1.67 pu. δ₀≈21°. Generator menyuplai reaktif Q besar.'},
+      {t:1.5,n:"Ef=1.0 pu. Pmax=0.833 pu. δ₀=46°. Margin ke δ_cr=88°. Q=−0.255 pu, pf 0.920 LEADING — generator menyerap daya reaktif (underexcited)."},
+      {t:4,fn(s){s.Ef=1.5;uiSl('Ef','1.5');},n:'Ef→1.5 pu. Pmax=1.25 pu. Kurva P-δ naik! δ₀=29°. Margin=123°. Q berbalik ke +0.263 pu, pf 0.916 lagging — kini menyuplai reaktif.'},
+      {t:12,fn(s){s.Ef=2.0;uiSl('Ef','2.0');},n:'Ef=2.0 pu. Pmax=1.67 pu. δ₀≈21°. Q=+0.722 pu, pf 0.639 lagging — overexcited berat, arus stator naik demi reaktif.'},
     ]},
 };
 function runSc(name){
