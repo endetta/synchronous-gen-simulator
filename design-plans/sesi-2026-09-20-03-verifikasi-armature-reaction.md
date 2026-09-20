@@ -127,7 +127,7 @@ git commit -m "docs(riset): verifikasi tabel armature reaction ke Kirtley Ch.4 �
 git push origin fix/critical-governor-and-bugs
 ```
 
-**Commit hash:** _[diisi setelah commit]_
+**Commit hash:** `aa4abaf` — 3 file, +200/−14
 
 ---
 
