@@ -160,7 +160,7 @@ git add docs/riset-medan-magnetik-dan-belitan.md \
 git commit -m "docs(riset): riset sumber primer medan magnet & belitan stator"
 ```
 
-**Commit hash:** _(diisi setelah commit)_
+**Commit hash:** `6d34800` — 4 file, +1162/−17
 
 ---
 
