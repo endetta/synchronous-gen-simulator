@@ -66,7 +66,7 @@ async function makeExtractor(htmlPath) {
       makeState, ode, rk4, stepPhys, procEvts, runSc, startRLR, stopRLR, toggleRLR,
       setMode, setAnimMode, doReset, trigSC, onSl, numSl, adjSl, togglePane,
       getPe, getPmax, getQe, getS, getPF, getPFNature, getCC, getCCT, getVt,
-      getPmEff, govActive,
+      getPmEff, govActive, getA2Available, eacStable, EAC_TOL,
       setNarr, autoNarr, updateCards, updateHdr,
       getRLRLoad, getRLRPeriod,
       getS_: () => S, setS_: v => { S = v; },

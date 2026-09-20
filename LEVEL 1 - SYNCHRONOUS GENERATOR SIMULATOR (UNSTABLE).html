@@ -519,6 +519,27 @@ function getPmEff(s){
   return Math.min(Math.max(raw,0),3.5);
 }
 
+// Kriteria stabilitas EAC buku teks: A₂ TERSEDIA (area deselerasi geometris dari
+// sudut clearing sampai δ_cr) ≥ A₁ (area akselerasi selama fault).
+// Catatan penting: A₂ yang diintegrasikan sampai puncak swing AKTUAL selalu sama
+// dengan A₁ — itulah definisi puncak (omega=0) — sehingga perbandingan itu
+// tautologis dan tidak berguna sebagai verdict. Yang menentukan stabilitas adalah
+// seberapa besar area deselerasi yang TERSEDIA sebelum rotor melewati δ_cr.
+// Toleransi 2% hanya untuk round-off RK4, bukan faktor kelonggaran ×0.8 yang lama.
+// (Kundur 1994 §11.2; Anderson & Fouad 2003 §2.4)
+const EAC_TOL=1.02;
+function getA2Available(s){
+  if(!(s.delta_cleared>0)) return 0;
+  const Pmax=s.Ef*s.V/Math.max(s.Xs,0.01);
+  const Pm=getPmEff(s);
+  const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
+  const dcr=Math.PI-d0;
+  const dc=s.delta_cleared;
+  if(dc>=dcr) return 0;                 // clearing sudah lewat δ_cr → tidak ada area tersisa
+  return Pmax*(Math.cos(dc)-Math.cos(dcr))-Pm*(dcr-dc);
+}
+function eacStable(s){ return getA2Available(s)>=s.A1_num/EAC_TOL; }
+
 function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
   const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
   const Pmax=s.Ef*s.V/Xs_safe;
@@ -587,15 +608,26 @@ function stepPhys(s,rdt){
       if(dts>s.sc_delay+s.sc_dur+1.5){s.sc_on=false;if(s.eac_phase==='post')s.eac_phase='done';}
     }else{s.sc_active=false;}
     // EAC area accumulation (numerical integration)
+    // A1 = area akselerasi selama fault; A2 = area deselerasi sampai puncak swing
+    // PERTAMA (omega melewati nol). Setelah puncak, A2 berhenti — kriteria buku
+    // teks membandingkan A2 tersedia pada swing pertama, bukan akumulasi tak terbatas.
+    // (Kundur 1994 §11.2; Anderson & Fouad 2003 §2.4)
     const Pmax_b=s.Ef*s.V/s.Xs;
     const Pm_eff=getPmEff(s);
     if(s.eac_phase==='fault'){
       const Pe_f=getPmax(s)*Math.sin(s.delta);
       s.A1_num+=Math.max(0,Pm_eff-Pe_f)*Math.abs(WS*s.omega*dt);
     }
-    if(s.eac_phase==='post'&&s.delta>s.delta_cleared){
-      const Pe_p=Pmax_b*Math.sin(s.delta);
-      s.A2_num+=Math.max(0,Pe_p-Pm_eff)*Math.abs(WS*s.omega*dt);
+    if(s.eac_phase==='post'){
+      if(s.omega>0){
+        if(s.delta>s.delta_cleared){
+          const Pe_p=Pmax_b*Math.sin(s.delta);
+          s.A2_num+=Math.max(0,Pe_p-Pm_eff)*Math.abs(WS*s.omega*dt);
+        }
+      }else{
+        // Rotor mencapai puncak pertama (omega berubah tanda) → A2 final.
+        s.eac_phase='done';
+      }
     }
     rk4(s,dt);
     procEvts(s);
@@ -660,9 +692,9 @@ function autoNarr(s){
   if(s.sc_active){setNarr(`FAULT AKTIF. Pe=${Pe.toFixed(4)} pu. ΔP=${acc.toFixed(3)} pu → rotor dipercepat. δ=${ddeg.toFixed(1)}°. δ_cr=${d_cr.toFixed(1)}°.`);return;}
   if(ddeg>158){setNarr(`KEHILANGAN SINKRONISASI! δ=${ddeg.toFixed(1)}°. Rotor pull-out. Reset diperlukan.`);return;}
   if(ddeg>d_cr-5){setNarr(`⚠ KRITIS! δ=${ddeg.toFixed(1)}° ≈ δ_cr=${d_cr.toFixed(1)}°.`);return;}
-  if(s.eac_phase==='post'){
-    const ok=s.A2_num>=s.A1_num*0.8;
-    setNarr(`SC cleared. A₁=${s.A1_num.toFixed(4)}, A₂=${s.A2_num.toFixed(4)} pu·rad. ${ok?'A₂≥A₁ → STABIL':'A₂<A₁ → TIDAK STABIL'}.`);return;
+  if(s.eac_phase==='post'||s.eac_phase==='done'){
+    const ok=eacStable(s), a2av=getA2Available(s);
+    setNarr(`SC cleared. A₁=${s.A1_num.toFixed(4)} pu·rad, A₂ tersedia=${a2av.toFixed(4)} pu·rad. ${ok?'A₂≥A₁ → STABIL':'A₂<A₁ → TIDAK STABIL'}.`);return;
   }
   if(Math.abs(acc)>0.04){setNarr(`Transien. ΔP=${acc>=0?'+':''}${acc.toFixed(4)} pu. δ=${ddeg.toFixed(2)}°, Δω=${(s.omega*1000).toFixed(3)} mpu.`);return;}
   const tcc=getCCT(s);
@@ -696,8 +728,8 @@ function updateCards(s){
     eacEl.innerHTML='FAULT | A<sub>1</sub>='+s.A1_num.toFixed(4)+' pu·rad | δ<sub>cc</sub>='+(dcc?(dcc*R2D).toFixed(1)+'°':'N/A');
     eacEl.style.color='var(--red)';
   }else if(s.eac_phase==='post'||s.eac_phase==='done'){
-    const ok=s.A2_num>=s.A1_num*0.8;
-    eacEl.innerHTML='A<sub>1</sub>='+s.A1_num.toFixed(4)+' | A<sub>2</sub>='+s.A2_num.toFixed(4)+' | <strong>'+(ok?'A<sub>2</sub>≥A<sub>1</sub> STABIL':'A<sub>2</sub><A<sub>1</sub> TIDAK STABIL')+'</strong>';
+    const ok=eacStable(s), a2av=getA2Available(s);
+    eacEl.innerHTML='A<sub>1</sub>='+s.A1_num.toFixed(4)+' | A<sub>2 tersedia</sub>='+a2av.toFixed(4)+' | <strong>'+(ok?'A<sub>2</sub>≥A<sub>1</sub> STABIL':'A<sub>2</sub><A<sub>1</sub> TIDAK STABIL')+'</strong>';
     eacEl.style.color=ok?'var(--green)':'var(--red)';
   }else if(dcc){
     eacEl.innerHTML='δ<sub>cc</sub>='+(dcc*R2D).toFixed(2)+'° | t<sub>cc</sub>='+(tcc?tcc.toFixed(3)+'s':'N/A')+' | Margin='+margin.toFixed(1)+'°';
