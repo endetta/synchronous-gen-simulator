@@ -144,7 +144,7 @@ input[type=number]:focus{border-color:var(--etap)}
 <div id="oos-overlay"></div>
 <div id="oos-warn">
   <span id="oos-txt">⚡ LOSS OF SYNCHRONISM — δ out of bounds — GENERATOR TRIP</span>
-  <button id="oos-dis" onclick="document.getElementById('oos-warn').classList.remove('show');document.getElementById('oos-overlay').classList.remove('show');stopOOSAlarm();doReset()">DISMISS &amp; RESET</button>
+  <button id="oos-dis" onclick="doReset()">DISMISS &amp; RESET</button>
 </div>
 <!-- HEADER -->
 <div class="hdr">
@@ -468,6 +468,7 @@ function makeState(){
     H,D,Xs,Ef,V,Pm, mode:'grid',
     sc_active:false, sc_on:false,
     sc_delay:0.3, sc_dur:0.20, sc_t0:0, sc_Pfact:0.04,
+    oos_tripped:false,
     hist:[], hlast:-1e9, anim:0,
     delta_sc_start:0, delta_cleared:0,
     A1_num:0, A2_num:0, eac_phase:'none',
@@ -593,6 +594,10 @@ function stepPhys(s,rdt){
   const cap=Math.min(rdt,0.08);
   const n=Math.max(1,Math.ceil(cap/PHDT)), dt=cap/n;
   for(let i=0;i<n;i++){
+    // TRIP: setelah kehilangan sinkronisasi, fisika berhenti. Tidak ada
+    // integrasi lebih lanjut — generator sudah lepas dari jaringan. Hanya
+    // DISMISS & RESET (doReset) yang boleh melepaskan latch ini.
+    if(s.oos_tripped) break;
     // RLR: drive Pm from load profile
     if(rlr_running){
       s.Pm=getRLRLoad(s.t);
@@ -653,18 +658,19 @@ function stepPhys(s,rdt){
   updateParticles(s,cap);
   s.anim+=VSPD*rdt;
   if(s.anim>Math.PI*2)s.anim-=Math.PI*2;
-  // OOS check
+  // OOS check — LATCHED. Begitu generator kehilangan sinkronisme, ia TRIP:
+  // fisika berhenti (lihat break di stepPhys) dan banner bertahan sampai
+  // pengguna menekan DISMISS & RESET. Tidak ada auto-clear: generator yang
+  // sudah lepas sinkron tidak "sembuh sendiri" saat rotor kebetulan melintas
+  // sudut kecil lagi.
   const ddeg=s.delta*R2D;
-  const oosEl=document.getElementById('oos-warn');
   if(ddeg>160||ddeg<-160){
-    document.getElementById('oos-txt').textContent='⚡ LOSS OF SYNCHRONISM — δ = '+ddeg.toFixed(1)+'° — GENERATOR TRIP REQUIRED';
-    oosEl.classList.add('show');
+    s.oos_tripped=true;
+    document.getElementById('oos-txt').textContent='⚡ LOSS OF SYNCHRONISM — δ = '+ddeg.toFixed(1)+'° — GENERATOR TRIP';
+    document.getElementById('oos-warn').classList.add('show');
     document.getElementById('oos-overlay').classList.add('show');
     startOOSAlarm();
-  }else if(!s.sc_active&&Math.abs(s.delta)<2.7){
-    oosEl.classList.remove('show');
-    document.getElementById('oos-overlay').classList.remove('show');
-    stopOOSAlarm();
+    if(rlr_running)stopRLR();
   }
 }
 

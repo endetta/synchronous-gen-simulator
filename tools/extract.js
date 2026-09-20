@@ -70,7 +70,6 @@ async function makeExtractor(htmlPath) {
       setNarr, autoNarr, updateCards, updateHdr,
       getRLRLoad, getRLRPeriod,
       getS_: () => S, setS_: v => { S = v; },
-      getStateRef: () => S,
       rlr_state: () => rlr_running, setRlr: v => { rlr_running = v; },
       RLR_PROFILE, RLR_PERIODS, RLR_SPEED, RLR_DUR,
       SCENARIOS,
