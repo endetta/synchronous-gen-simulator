@@ -1,6 +1,6 @@
 # Plan: Realistic Magnetic Field Visualization
 
-**Status:** DRAF — DIREVISI 2026-09-20
+**Status:** PROGRESS — Fase 0 SELESAI (commit `2120cad`, 2026-09-20); Fase 1–2 menunggu approval
 **Dibuat:** 2026-09-09
 **Direvisi:** 2026-09-20 (setelah riset sumber primer)
 **Sumber:** `docs/riset-medan-magnetik-dan-belitan.md` (primer, terverifikasi)
@@ -128,7 +128,7 @@ kumparan — bukan titik.
 2. **Belitan stator sebagai kumparan (menggantikan 18 `<circle>` `winding-{A,B,C}-{i}`)**
    - Path kumparan tersambung: masuk lewat satu slot, keluar lewat slot berseberangan 180°
      (Kirtley §3: kedua sisi kumparan terpisah `π/p`; untuk 2-kutub = 180°)
-   - Penanda arah arus dot/cross per sisi konduktor, id `#cd-{fasa}-{sisi}`
+   - Penanda arah arus dot/cross per sisi konduktor, id `#cd-{fasa}-{i}-dot` / `#cd-{fasa}-{i}-x`
    - Arah berbalik mengikuti arus fasa sinusoidal, memakai `S.t` — **bukan `Date.now()`**
 
 3. **Penanda RMF stator (`#g-rmf`)**
@@ -146,19 +146,23 @@ kumparan — bukan titik.
    - Memberi arti konkret pada label "N"/"S" yang sekarang mengambang
 
 **Target kode:**
-- `initSvgRealistic()` — tambah `#g-rotor`, `#g-flux`, `#g-rmf`, `#d-arc`, `#cd-{f}-{s}`
+- `initSvgRealistic()` — tambah `#g-rotor`, `#g-flux`, `#g-rmf`, `#d-arc`, `#cd-{f}-{i}-dot`/`-x`
 - `updateSvgPhasorRealistic()` — pseudocode lengkap di riset §7.4
-- Fungsi baru: `buildFluxPaths()`, `traceFieldLine()`, `rebuildFluxPaths()`
+- Fungsi baru: `buildFluxPath()`, `buildCoilPath()`, `rebuildFluxPaths()`
 
 **Kriteria selesai:**
-- [ ] Garis fluks terlihat, rapat di kutub dan renggang di garis netral
-- [ ] Garis berputar rigid bersama rotor (via `transform`, bukan `d`)
-- [ ] Belitan berbentuk kumparan tersambung, bukan titik
-- [ ] Arah arus terlihat berubah (dot/cross) mengikuti `S.t`
-- [ ] Busur δ terlihat dan nilainya cocok dengan `S.delta`
-- [ ] Slider `Ef` mengubah kerapatan garis fluks dengan pemetaan melengkung
-- [ ] Saat `sc_active`, garis fluks **TIDAK** mengerut (asas constant flux linkage)
-- [ ] Tidak ada lagi `Date.now()` di jalur animasi mode realistis
+- [x] Garis fluks terlihat, rapat di kutub dan renggang di garis netral
+- [x] Garis berputar rigid bersama rotor (via `transform`, bukan `d`)
+- [x] Belitan berbentuk kumparan tersambung, bukan titik
+- [x] Arah arus terlihat berubah (dot/cross) mengikuti `S.t`
+- [x] Busur δ terlihat dan nilainya cocok dengan `S.delta`
+- [x] Slider `Ef` mengubah kerapatan garis fluks dengan pemetaan melengkung
+- [x] Saat `sc_active`, garis fluks **TIDAK** mengerut (asas constant flux linkage)
+- [x] Tidak ada lagi `Date.now()` di jalur animasi mode realistis
+
+*(Semua kriteria terverifikasi 2026-09-20 oleh `tools/realistic-field.test.js`
+(43 assertion, 11 seksi) + verifikasi browser — bukti di
+`design-plans/sesi-2026-09-20-05-fase0-medan-magnet.md`.)*
 
 **Prasyarat verifikasi:** tabel armature reaction di riset §4.4 — **TERVERIFIKASI** (2026-09-20).
 Rumus `I_d` adalah kutipan langsung Kirtley Ch.4 §9; tabel didukung tiga sumber (Kirtley §9 +
