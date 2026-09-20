@@ -11,7 +11,6 @@
 <!-- Chart.js for Time Series (with SRI for security) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha384-zPzbVRXfR492Sd5D+HydTYCxxgHAfgVO8KERbLlpeH5unsmbAEXrscGUUqLZG9BM" crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -154,7 +153,14 @@ input[type=number]:focus{border-color:var(--etap)}
 .amode-btn{padding:3px 8px;border:1px solid var(--brd2);border-radius:3px;font-family:var(--serif);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);background:var(--surf);cursor:pointer;transition:all .15s}
 .amode-btn:hover{background:var(--surf2)}
 /* Saat pengguna sedang drag panel, tombol animasi tidak boleh bisa diklik
+   secara tidak sengaja (pointer tetap bisa bergeser ke atasnya saat mousemove). */
 body.is-dragging .amode-btn,body.is-dragging .pane-resize button{pointer-events:none;opacity:.5}
+@media (prefers-reduced-motion: reduce){
+  .sc-badge{animation:none}
+  #oos-overlay{animation:none}
+  #oos-warn{animation:none}
+  .hdr-title::before{animation:none;-webkit-text-fill-color:var(--txt);background:none;filter:none}
+}
 .amode-btn.active{background:var(--etap);border-color:var(--etap);color:#fff}
 </style>
 </head>
@@ -731,6 +737,13 @@ function autoNarr(s){
   const Pm_eff=getPmEff(s);
   const d_s=Math.asin(Math.min(Pm_eff/Pmax,0.9999))*R2D,d_cr=180-d_s;
   const ddeg=s.delta*R2D,acc=Pm_eff-Pe;
+  // Rate-limit 2 Hz: teks narasi tidak berganti lebih cepat dari yang bisa
+  // dibaca. Kejadian penting (fault, OOS, verdict EAC) melewati limit ini
+  // karena dipicu perubahan fase, bukan sekadar aliran angka.
+  const NARR_MIN_DT=0.5;
+  const isEvent=s.sc_active||ddeg>158||(s.eac_phase==='post')||(s.eac_phase==='done');
+  if(!isEvent&&s._narr_t!==undefined&&(s.t-s._narr_t)<NARR_MIN_DT)return;
+  s._narr_t=s.t;
   if(s.sc_active){setNarr(`FAULT AKTIF. Pe=${Pe.toFixed(4)} pu. ΔP=${acc.toFixed(3)} pu → rotor dipercepat. δ=${ddeg.toFixed(1)}°. δ_cr=${d_cr.toFixed(1)}°.`);return;}
   if(ddeg>158){setNarr(`KEHILANGAN SINKRONISASI! δ=${ddeg.toFixed(1)}°. Rotor pull-out. Reset diperlukan.`);return;}
   if(ddeg>d_cr-5){setNarr(`⚠ KRITIS! δ=${ddeg.toFixed(1)}° ≈ δ_cr=${d_cr.toFixed(1)}°.`);return;}
@@ -2604,6 +2617,7 @@ function setMode(m){
   S.mode=m;
   document.getElementById('bGrid').classList.toggle('on',m==='grid');
   document.getElementById('bIsland').classList.toggle('on',m==='island');
+  syncModeAria(m);
   // Reset chart scales when mode changes
   Object.values(chartStabilizers).forEach(s=>s.reset());
 }
@@ -2679,6 +2693,7 @@ function togglePane(n){
     if(b)b.classList.toggle('on',paneVis[i-1]);
   });
   phasorReady=false; pdInit=false;
+  syncPaneAria();
 }
 
 // ================================================================
@@ -2948,23 +2963,106 @@ const tipEl=document.getElementById('tooltip');
 const tipTitle=document.getElementById('tip-title');
 const tipBody=document.getElementById('tip-body');
 const tipEff=document.getElementById('tip-effect');
+
+// Isi tooltip dari data TIPS. Dipakai oleh jalur mouse, keyboard, dan sentuh.
+function fillTip(el){
+  const d=TIPS[el.getAttribute('data-tip')];if(!d)return false;
+  tipTitle.innerHTML=d.title;
+  tipBody.innerHTML=`<div class="tip-row"><strong>Unit:</strong> ${d.unit}</div><div class="tip-row"><strong>Range PLTU:</strong> ${d.range}</div><div class="tip-row" style="margin-top:5px">${d.desc}</div>`;
+  tipEff.innerHTML='▶ '+d.effect;
+  return true;
+}
+// Posisi tooltip dari sebuah elemen (untuk focus/sentuh yang tidak punya clientX/Y).
+function positionTipAt(el){
+  const r=el.getBoundingClientRect();
+  let x=r.left, y=r.bottom+6;
+  if(x+310>window.innerWidth) x=Math.max(4,window.innerWidth-316);
+  if(y+260>window.innerHeight) y=Math.max(4,r.top-266);
+  tipEl.style.left=x+'px'; tipEl.style.top=y+'px';
+}
+function hideTip(){ tipEl.classList.remove('show'); }
+
 document.querySelectorAll('[data-tip]').forEach(el=>{
-  el.addEventListener('mouseenter',e=>{
-    const d=TIPS[el.getAttribute('data-tip')];if(!d)return;
-    tipTitle.innerHTML=d.title;
-    tipBody.innerHTML=`<div class="tip-row"><strong>Unit:</strong> ${d.unit}</div><div class="tip-row"><strong>Range PLTU:</strong> ${d.range}</div><div class="tip-row" style="margin-top:5px">${d.desc}</div>`;
-    tipEff.innerHTML='▶ '+d.effect;
-    tipEl.classList.add('show');
-    moveTip(e);
-  });
+  // Mouse (desktop)
+  el.addEventListener('mouseenter',e=>{ if(fillTip(el)){tipEl.classList.add('show');moveTip(e);} });
   el.addEventListener('mousemove',moveTip);
-  el.addEventListener('mouseleave',()=>tipEl.classList.remove('show'));
+  el.addEventListener('mouseleave',hideTip);
+  // Keyboard: label dapat difokus (tabindex di-set di bawah) dan dibuka
+  // dengan Enter/Space. Tanpa ini, pengguna keyboard tidak pernah melihat
+  // penjelasan fisika sama sekali.
+  el.addEventListener('focus',()=>{ if(fillTip(el)){tipEl.classList.add('show');positionTipAt(el);} });
+  el.addEventListener('blur',hideTip);
+  el.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '||e.key==='Escape'){
+      e.preventDefault();
+      if(e.key==='Escape'){hideTip();return;}
+      if(tipEl.classList.contains('show')) hideTip();
+      else if(fillTip(el)){tipEl.classList.add('show');positionTipAt(el);}
+    }
+  });
+  // Sentuh: ketukan pertama membuka, ketukan berikutnya (atau di luar) menutup.
+  el.addEventListener('touchend',e=>{
+    e.preventDefault();
+    if(tipEl.classList.contains('show')) hideTip();
+    else if(fillTip(el)){tipEl.classList.add('show');positionTipAt(el);}
+  });
+  // Agar bisa difokus dengan Tab dan dibacakan screen reader.
+  if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+  if(!el.hasAttribute('role')) el.setAttribute('role','button');
+  if(!el.hasAttribute('aria-label')) el.setAttribute('aria-label','Penjelasan parameter: '+el.textContent.trim());
 });
+// Ketukan di luar menutup tooltip (perilaku sentuh yang wajar).
+document.addEventListener('touchstart',e=>{
+  if(!e.target.closest('[data-tip]')) hideTip();
+},{passive:true});
 function moveTip(e){
   let x=e.clientX+16,y=e.clientY+12;
   if(x+310>window.innerWidth)x=e.clientX-320;
   if(y+260>window.innerHeight)y=e.clientY-270;
   tipEl.style.left=x+'px';tipEl.style.top=y+'px';
+}
+
+// ================================================================
+// AKSESIBILITAS — label untuk kontrol yang tidak punya <label> eksplisit.
+// Slider dan input angka dianotasi dari TIPS agar screen reader membacakan
+// nama parameter, bukan sekadar "slider" tanpa konteks.
+// ================================================================
+function initA11yLabels(){
+  Object.keys(TIPS).forEach(key=>{
+    const t=TIPS[key];
+    const sl=document.getElementById('s'+key);
+    const num=document.getElementById('n'+key);
+    if(sl){
+      if(!sl.hasAttribute('aria-label')) sl.setAttribute('aria-label',t.title);
+      sl.setAttribute('aria-valuemin',sl.min);
+      sl.setAttribute('aria-valuemax',sl.max);
+    }
+    if(num&&!num.hasAttribute('aria-label')) num.setAttribute('aria-label',t.title);
+  });
+  // Tombol toggle panel: nyatakan statusnya ke assistive tech.
+  [1,2,3].forEach(i=>{
+    const b=document.getElementById('pt'+i);
+    if(b&&!b.hasAttribute('aria-pressed')){
+      b.setAttribute('aria-pressed',paneVis[i-1]?'true':'false');
+      b.setAttribute('aria-controls','pane'+i);
+    }
+  });
+  // Tombol mode operasi.
+  const bg=document.getElementById('bGrid'),bi=document.getElementById('bIsland');
+  if(bg&&!bg.hasAttribute('aria-pressed')) bg.setAttribute('aria-pressed','true');
+  if(bi&&!bi.hasAttribute('aria-pressed')) bi.setAttribute('aria-pressed','false');
+}
+// Jaga aria-pressed tetap sinkron saat panel di-toggle.
+function syncPaneAria(){
+  [1,2,3].forEach(i=>{
+    const b=document.getElementById('pt'+i);
+    if(b) b.setAttribute('aria-pressed',paneVis[i-1]?'true':'false');
+  });
+}
+function syncModeAria(m){
+  const bg=document.getElementById('bGrid'),bi=document.getElementById('bIsland');
+  if(bg) bg.setAttribute('aria-pressed',m==='grid'?'true':'false');
+  if(bi) bi.setAttribute('aria-pressed',m==='island'?'true':'false');
 }
 
 // ================================================================
@@ -2975,6 +3073,7 @@ window.addEventListener('load',()=>{
   initDragHandles();
   initTimeCharts();
   initPaneResizeControls();
+  initA11yLabels();
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
   drawRLRChart(S);
 
