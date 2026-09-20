@@ -59,18 +59,23 @@ Kemudian akses `http://localhost:8080`
 ## 🛠️ Testing
 
 ```bash
-# Model physics tests
-node tools/model.test.js
+# Suite inti (fisika, UI, chart)
+npm test
 
-# UI structure tests
-node tools/ui.test.js
+# Tes fisika individual — semua mengekstrak fungsi dari HTML via tools/extract.js
+node tools/model.test.js                  # fisika vs analitik
+node tools/governor-steady-state.test.js  # governor island/RLR
+node tools/eac-verdict.test.js            # kriteria stabilitas EAC
+node tools/oos-trip.test.js               # loss-of-synchronism latch
+node tools/reactive-power.test.js         # Q, S, power factor
 
 # Screenshot automation
 node tools/shoot.js
-
-# Verifikasi screenshots
-node tools/shoot.js --check
 ```
+
+**Catatan:** tes fisika mengekstrak fungsi langsung dari blok `<script>` HTML
+(`tools/extract.js`) — tidak ada rumus yang disalin ke file tes, sehingga
+menghapus atau mengubah fungsi fisika akan membuat tes GAGAL.
 
 ---
 
@@ -83,13 +88,17 @@ LEVEL 1 - SYNCHRONOUS GEN (UNSTABLE)/
 ├── .gitignore
 ├── LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html
 ├── docs/
-│   ├── PRD.md          # Product Requirements Document
+│   ├── PRD.md          # Product Requirements Document (sumber kebenaran model)
 │   └── overview.md     # Developer overview
 ├── design-plans/
-│   └── sesi-*.md       # Session logs
+│   └── sesi-*.md       # Log sesi
 └── tools/
-    ├── model.test.js   # Physics tests
-    ├── ui.test.js      # UI tests
+    ├── extract.js      # Seam ekstraksi fisika dari HTML
+    ├── model.test.js   # Fisika vs analitik
+    ├── governor-steady-state.test.js
+    ├── eac-verdict.test.js
+    ├── oos-trip.test.js
+    ├── ui.test.js      # Struktur DOM
     └── shoot.js        # Screenshot tool
 ```
 
@@ -110,19 +119,21 @@ LEVEL 1 - SYNCHRONOUS GEN (UNSTABLE)/
 
 ### Yang Sudah Diimplementasi:
 - ✅ Swing equation dengan RK4 integrator
-- ✅ TGOV1 governor model
+- ✅ TGOV1 governor model (island/RLR + bumpless transfer)
 - ✅ Grid/Island mode
 - ✅ Short circuit event
-- ✅ EAC visualization
-- ✅ Loss of synchronism detection
+- ✅ EAC visualization + verdict buku teks (A₂ tersedia ≥ A₁)
+- ✅ Loss of synchronism detection (latch + fisika berhenti)
 - ✅ RLR simulation
 - ✅ Preset scenarios
+- ✅ Daya reaktif Q / S / power factor
+- ✅ Test suite dengan seam ekstraksi dari HTML
 
 ### Yang Belum:
-- ⏳ Automated test suite
-- ⏳ Screenshot baseline
+- ⏳ Screenshot baseline (shoot.js punya masalah Chrome headless)
 - ⏳ CI/CD pipeline
 - ⏳ Mobile responsive
+- ⏳ Zoom/pan pada time series
 
 ---
 

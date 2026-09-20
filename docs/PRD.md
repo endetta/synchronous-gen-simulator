@@ -54,14 +54,35 @@ di mana:
 **Referensi:** IEEE Std 421.5-2005
 
 ```
-dXg/dt = (1/T₁) · (-ω/R - Xg)
-dPm_gov/dt = (1/T₂) · (Xg - Pm_gov)
+dXg/dt    = (1/T₁) · (Pm − ω/R − Xg)     [saat governor aktif: island / RLR]
+dXg/dt    = −Xg / 0.05                    [grid mode: governor di-decay ke nol]
+dPm_gov/dt = (1/T₂) · (Xg − Pm_gov)
 ```
+
+**Pemetaan ke daya mekanik (penting):**
+
+```
+Pm_eff = Pm_gov   saat governor aktif (island / RLR)
+Pm_eff = Pm       saat grid mode
+```
+
+`Pm_gov` adalah **keluaran** governor — ia **adalah** daya mekanik efektif saat
+governor aktif. `Pm` hanyalah setpoint yang dikejar servo. Menjumlahkan
+keduanya (`Pm + Pm_gov`) menghitung setpoint dua kali dan menyebabkan rotor
+lepas sinkron di island mode. Lihat `getPmEff()` dan `govActive()` di kode.
 
 Parameter:
 - `T₁ = 0.5 s` — servo time constant
 - `T₂ = 3.5 s` — steam chest + reheater time constant
 - `R = 5%` — droop
+
+**Bumpless transfer:** saat berpindah dari grid ke island (atau memulai RLR),
+`Xg` dan `Pm_gov` di-seed dengan `Pm` saat itu supaya daya mekanik tidak
+jatuh ke nol sesaat.
+
+> **Catatan grid mode:** governor tidak aktif saat terhubung infinite bus —
+> `Xg` di-decay ke nol dan daya mekanik datang langsung dari setpoint `Pm`.
+> Redaman jaringan infinite bus dimodelkan sebagai `D_eff = D + 2`.
 
 ### 2.4 Equal Area Criterion (EAC)
 
@@ -126,7 +147,11 @@ Stabilitas: `A₂ ≥ A₁` → STABIL
 |-----------|-------|---------|--------|
 | SC Onset Delay | 0–10 | 0.3 | s |
 | SC Duration | 0.02–5 | 0.20 | s |
-| SC Power Factor | — | 0.04 | pu |
+
+Catatan model: fault dimodelkan sebagai *bolted three-phase fault* — tegangan
+terminal kolaps ke 4% nilai nominal selama fault (`sc_Pfact = 0.04`, konstanta
+internal, bukan parameter yang dapat diatur user). Efeknya P dan Q sama-sama
+jatuh selama gangguan.
 
 ### 3.5 Real Load Response (RLR)
 
@@ -207,23 +232,34 @@ Stabilitas: `A₂ ≥ A₁` → STABIL
 | Library | Version | Purpose | License |
 |---------|---------|---------|---------|
 | Chart.js | 4.4.1 | Time series visualization (δ, ω, f, P) | MIT |
-| chartjs-plugin-annotation | 3.3.0 | EAC area annotations on charts | MIT |
-| chartjs-plugin-zoom | 2.0.1 | Chart pan/zoom for detailed analysis | MIT |
+| chartjs-plugin-annotation | 3.1.0 | EAC area annotations on charts | MIT |
 
 **CDN URLs with SRI:**
 ```html
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.3.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-bYKsxjqxaylGfcsbR8gpRpA4n3bKucz/Z7MqapB0Io/RiuxGVJ+808uklxP0CwN2" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" integrity="sha384-zPzbVRXfR492Sd5D+HydTYCxxgHAfgVO8KERbLlpeH5unsmbAEXrscGUUqLZG9BM" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js" integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY" crossorigin="anonymous"></script>
 ```
 
-**Note:** SRI hashes ensure CDN integrity. Verify at https://www.srihash.org/
+**Note:** SRI hashes ensure CDN integrity. Verify at https://www.srihash.org/ —
+wajib di-regenerate setiap kali versi library di-upgrade. Versi & hash di tabel
+ini HARUS identik dengan `<script>` di file HTML utama; kalau tidak, dokumen
+ini yang salah.
+
+(Riwayat: chartjs-plugin-zoom@2.0.1 pernah dimuat tapi tidak pernah
+dikonfigurasi — dihapus 2026-09-20. Tambahkan kembali HANYA bersama
+konfigurasi `plugins.zoom` yang benar-benar dipakai.)
 
 ### 5.3 Browser Compatibility
 
 - **Browser:** Chrome 90+, Firefox 88+, Edge 90+
 - **Resolution:** Minimum 1280×720
-- **Core functionality:** Works offline after initial CDN load (browser cache)
+- **Koneksi:** Chart.js dan plugin-nya dimuat dari CDN saat halaman dibuka —
+  **butuh koneksi internet**. Tidak ada Service Worker atau salinan lokal.
+  Setelah pemuatan pertama, cache browser biasanya melayani permintaan
+  berikutnya, tetapi ini **tidak dijamin** (mode privat, cache dibersihkan,
+  atau kebijakan jaringan bisa menggagalkannya). Untuk lingkungan tanpa
+  internet (lab terisolasi), unduh kedua library ke folder lokal dan ubah
+  `src` di HTML.
 
 ### 5.4 Accuracy
 
@@ -248,5 +284,6 @@ Stabilitas: `A₂ ≥ A₁` → STABIL
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.1.0-unstable | 2026-09-20 | §2.3 governor dirombak (Pm_gov sebagai output, bumpless, catatan grid mode) — sinkron dengan perbaikan commit 12125cc; §3.4 SC Power Factor dihapus dari daftar parameter (konstanta internal); §5.2 versi annotation 3.1.0 + zoom dihapus; §5.3 klaim offline direvisi |
 | 0.1.0-unstable | 2026-09-09 | Added §5.2 Dependencies (Chart.js + plugins with SRI) |
 | 0.1.0-unstable | 2026-09-08 | Initial PRD draft |

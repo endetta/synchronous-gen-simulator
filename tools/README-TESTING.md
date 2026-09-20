@@ -245,16 +245,23 @@ tools/
 ├── puppeteer-test-runner.js     ← Puppeteer automated test
 ├── interaction-test.js          ← Test scenarios definition
 ├── run-interaction-tests.js     ← Helper script
-├── model.test.js                ← Unit test: physics model
+├── extract.js                   ← Seam: ekstraksi fisika dari HTML (dipakai tes fisika)
+├── model.test.js                ← Unit test: physics model (ekstrak dari HTML)
+├── governor-steady-state.test.js ← Governor island/RLR + bumpless
+├── eac-verdict.test.js          ← Kriteria stabilitas EAC
+├── oos-trip.test.js             ← Loss-of-synchronism latch
 ├── ui.test.js                   ← Unit test: DOM structure
 ├── chart-scale.test.js          ← Unit test: chart scaling
-├── lens-harness.js              ← Mock DOM for unit tests
 ├── shoot.js                     ← Screenshot tool (legacy)
 ├── test-results/                ← Output directory
 │   ├── report.json
 │   └── screenshots/
 └── README-TESTING.md            ← This file
 ```
+
+(Catatan: `lens-harness.js` dihapus 2026-09-20 — isinya dokumen Markdown
+berekstensi `.js`, tidak pernah bisa dijalankan. Perannya digantikan
+`extract.js` + tes fisika yang mengekstrak dari HTML.)
 
 ---
 

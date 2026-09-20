@@ -31,11 +31,31 @@ tanpa build step, tanpa framework. CSS inline, JavaScript inline.
 
 | Test File | Fungsi | Command | Status |
 |-----------|--------|---------|--------|
-| `tools/model.test.js` | Validasi physics engine (swing equation, EAC, RK4, governor) | `node tools/model.test.js` | ✅ 17 tests passing |
+| `tools/model.test.js` | Fisika vs analitik (swing, EAC, RK4, RLR, Q/pf) | `node tools/model.test.js` | ✅ 25 assertion |
+| `tools/governor-steady-state.test.js` | Governor island/RLR steady-state + bumpless transfer | `node tools/governor-steady-state.test.js` | ✅ 7 assertion |
+| `tools/eac-verdict.test.js` | Kriteria stabilitas EAC buku teks (A₂ tersedia ≥ A₁) | `node tools/eac-verdict.test.js` | ✅ 6 assertion |
+| `tools/oos-trip.test.js` | Latch loss-of-synchronism + fisika berhenti saat trip | `node tools/oos-trip.test.js` | ✅ 6 assertion |
 | `tools/ui.test.js` | Validasi struktur HTML, DOM elements, UI controls | `node tools/ui.test.js` | ✅ 79 tests passing |
 | `tools/chart-scale.test.js` | Validasi scale stabilizer untuk time series charts | `node tools/chart-scale.test.js` | ✅ 17 tests passing |
+| `tools/reactive-power.test.js` | Daya reaktif Q, S, pf (ekstrak dari HTML) | `node tools/reactive-power.test.js` | ✅ 55 assertion |
 
-**Total: 113 tests passing** — Jalankan sebelum dan sesudah perubahan signifikan.
+Jalankan `npm test` untuk suite inti; jalankan file lain di `tools/*.test.js`
+secara individual (time-series, layout, performa).
+
+### Seam Pengujian — `tools/extract.js`
+
+Tes fisika **mengekstrak fungsi langsung dari blok `<script>` HTML** (stub DOM
+minimal, tanpa perlu build atau browser). Ini berarti:
+
+- Menghapus atau me-rename fungsi fisika di HTML akan membuat tes GAGAL dengan
+  pesan `SEAM GAGAL: ...` yang menyebut fungsi mana yang hilang.
+- Daftar fungsi wajib ada di konstanta `REQUIRED` di `tools/extract.js`.
+- Kalau menambah fungsi fisika baru yang perlu dites, tambahkan ke `names`
+  dan (bila wajib) ke `REQUIRED`.
+
+**Jangan** menyalin rumus fisika ke dalam file tes — pakai ekstraksi. Tes yang
+menyalin rumus akan tetap hijau meski HTML diubah total (jebakan yang sudah
+diperbaiki di commit `2b1644c`).
 
 ### Kapan Menggunakan Test Harness
 
@@ -49,16 +69,15 @@ tanpa build step, tanpa framework. CSS inline, JavaScript inline.
    - Tambah test case baru jika menemukan edge case
 
 3. **Sesudah task:**
-   - Jalankan semua tests: `node tools/model.test.js && node tools/ui.test.js && node tools/chart-scale.test.js`
-   - Pastikan tidak ada regression
+   - Jalankan `npm test` + tes terkait; pastikan tidak ada regresi
    - Commit hanya jika semua tests pass
 
 ### Tools Lainnya
 
 | Tool | Fungsi | Command | Catatan |
 |------|--------|---------|---------|
+| `tools/extract.js` | Seam ekstraksi fisika dari HTML (stub DOM) | dipakai oleh tes | Jangan diubah tanpa alasan kuat |
 | `tools/shoot.js` | Screenshot automation untuk 8 view states | `node tools/shoot.js` | ⚠️ Chrome headless issue (manual testing preferred) |
-| `tools/lens-harness.js` | Mock-DOM harness untuk load simulator di Node.js | Required oleh test files | Jangan diubah tanpa alasan kuat |
 
 ### Workflow dengan Test Harness
 
@@ -91,6 +110,14 @@ di mana:
 - `T₁ = 0.5 s` — servo time constant
 - `T₂ = 3.5 s` — steam chest + reheater time constant
 - `R = 5%` — droop
+
+**Pemetaan daya (JANGAN diubah tanpa membaca ini):** saat governor aktif
+(island / RLR), `Pm_gov` **adalah** daya mekanik efektif — `Pm` hanya setpoint
+yang dikejar servo. `Pm_eff = getPmEff(s)` memilih `Pm_gov` atau `Pm`
+tergantung `govActive(s)`. Menjumlahkan keduanya (`s.Pm + s.Pm_gov`)
+menghitung setpoint dua kali dan menyebabkan island mode selalu loss of
+synchronism — bug yang diperbaiki di commit `12125cc` dan dijaga oleh
+`tools/governor-steady-state.test.js`.
 
 ### Equal Area Criterion (EAC) — Kundur 1994 §11.2-11.3
 - `δ_cr = π - δ₀` — critical angle
@@ -181,12 +208,12 @@ di mana:
 
 ## Roadmap
 
-- [x] Test harness dengan Node.js (lens-harness.js) — ✅ 113 tests passing
+- [x] Test harness dengan Node.js (seam ekstraksi `tools/extract.js`) — fisika diekstrak dari HTML, bukan disalin
 - [x] GitHub repo initialization — ✅ https://github.com/endetta/synchronous-gen-simulator
 - [x] Chart.js integration untuk time series visualization
+- [x] Dokumentasi PRD formal (docs/PRD.md)
 - [ ] Stabilisasi fitur core — manual browser testing
 - [ ] Screenshot automation (shoot.js) — ⚠️ Chrome headless issue
-- [ ] Dokumentasi PRD formal
 - [ ] CI/CD dengan GitHub Actions
 
 ## Catatan Penting
