@@ -64,6 +64,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .drag-handle{position:absolute;bottom:0;left:0;right:0;height:7px;cursor:ns-resize;background:linear-gradient(to bottom,transparent,rgba(184,192,212,.45));z-index:10}
 .drag-handle:hover{background:linear-gradient(to bottom,transparent,rgba(196,32,0,.2))}
 .drag-handle::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:32px;height:2px;border-radius:2px;background:rgba(160,170,192,.6)}
+/* Kontrol resize pane — di-anchor ke ATAS pane (bukan bawah) supaya selalu
+   terlihat. Pane III adalah pane terakhir di #vizScroll: kalau kontrolnya ikut
+   di bawah, ia tenggelam ke luar viewport tepat saat pane itu tumbuh.
+   Kanan-atas dipilih karena .vlabel sudah menempati kiri-atas.
+   Pane I punya .anim-mode-toggle di kanan-atas juga, jadi kontrolnya digeser
+   turun (lihat override #pane1) agar tidak bertumpuk. */
+.pane-resize{position:absolute;top:5px;right:10px;z-index:11;display:flex;gap:3px;align-items:center}
+.pane-resize .prz-size{font-family:var(--mono);font-size:9px;color:var(--dim2);min-width:34px;text-align:right;pointer-events:none}
+/* Pane I: turunkan kontrol resize ke bawah toggle mode animasi. */
+#pane1 .pane-resize{top:30px}
+.pane-resize button{width:19px;height:17px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--brd2);border-radius:3px;background:var(--surf);color:var(--dim);font-family:var(--mono);font-size:11px;font-weight:700;line-height:1;cursor:pointer;transition:all .15s}
+.pane-resize button:hover{border-color:var(--etap);color:var(--etap);background:var(--surf2)}
+.pane-resize button:focus-visible{outline:2px solid var(--etap);outline-offset:1px}
+.pane-resize button:disabled{opacity:.35;cursor:not-allowed}
+.pane-resize .prz-size{font-family:var(--mono);font-size:9px;color:var(--dim2);min-width:34px;text-align:right;pointer-events:none}
+.vpane.zoomed{box-shadow:inset 0 0 0 2px rgba(196,32,0,.35)}
 .ctrl{flex:1;overflow-y:auto;background:var(--surf2);scrollbar-width:thin;scrollbar-color:var(--brd2) transparent}
 .ctrl::-webkit-scrollbar{width:5px}
 .ctrl::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:3px}
@@ -137,6 +153,8 @@ input[type=number]:focus{border-color:var(--etap)}
 .anim-mode-toggle{position:absolute;top:6px;right:10px;z-index:10;display:flex;gap:4px}
 .amode-btn{padding:3px 8px;border:1px solid var(--brd2);border-radius:3px;font-family:var(--serif);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);background:var(--surf);cursor:pointer;transition:all .15s}
 .amode-btn:hover{background:var(--surf2)}
+/* Saat pengguna sedang drag panel, tombol animasi tidak boleh bisa diklik
+body.is-dragging .amode-btn,body.is-dragging .pane-resize button{pointer-events:none;opacity:.5}
 .amode-btn.active{background:var(--etap);border-color:var(--etap);color:#fff}
 </style>
 </head>
@@ -183,18 +201,36 @@ input[type=number]:focus{border-color:var(--etap)}
           <button class="amode-btn" id="amode-realistic" onclick="setAnimMode('realistic')">Realistis</button>
         </div>
         <svg id="svgPhasor" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"></svg>
+        <div class="pane-resize" data-pane-resize="pane1">
+          <span class="prz-size" data-pane-size="pane1"></span>
+          <button type="button" onclick="resizePane('pane1',-1)" title="Perkecil panel" aria-label="Perkecil panel">−</button>
+          <button type="button" onclick="resizePane('pane1',1)" title="Perbesar panel" aria-label="Perbesar panel">+</button>
+          <button type="button" onclick="toggleMaximizePane('pane1')" title="Maksimalkan / pulihkan panel" aria-label="Maksimalkan atau pulihkan panel">⤢</button>
+        </div>
         <div class="drag-handle" data-pane="pane1"></div>
       </div>
       <!-- Panel 2: SVG P-delta -->
       <div class="vpane" id="pane2" style="height:300px">
         <div class="vlabel">II · P–δ Curve &amp; Equal Area Criterion</div>
         <svg id="svgPdelta" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"></svg>
+        <div class="pane-resize" data-pane-resize="pane2">
+          <span class="prz-size" data-pane-size="pane2"></span>
+          <button type="button" onclick="resizePane('pane2',-1)" title="Perkecil panel" aria-label="Perkecil panel">−</button>
+          <button type="button" onclick="resizePane('pane2',1)" title="Perbesar panel" aria-label="Perbesar panel">+</button>
+          <button type="button" onclick="toggleMaximizePane('pane2')" title="Maksimalkan / pulihkan panel" aria-label="Maksimalkan atau pulihkan panel">⤢</button>
+        </div>
         <div class="drag-handle" data-pane="pane2"></div>
       </div>
       <!-- Panel 3: Canvas Time Series -->
       <div class="vpane" id="pane3" style="height:300px">
         <div class="vlabel">III · Time Series</div>
         <canvas id="cv3"></canvas>
+        <div class="pane-resize" data-pane-resize="pane3">
+          <span class="prz-size" data-pane-size="pane3"></span>
+          <button type="button" onclick="resizePane('pane3',-1)" title="Perkecil panel" aria-label="Perkecil panel">−</button>
+          <button type="button" onclick="resizePane('pane3',1)" title="Perbesar panel" aria-label="Perbesar panel">+</button>
+          <button type="button" onclick="toggleMaximizePane('pane3')" title="Maksimalkan / pulihkan panel" aria-label="Maksimalkan atau pulihkan panel">⤢</button>
+        </div>
         <div class="drag-handle" data-pane="pane3"></div>
       </div>
     </div>
@@ -1969,6 +2005,75 @@ const MIN_CHART_H=60;
 // Lantai konten container chart = padding atas 24 + bawah 6 + 4 chart + 3 gap 2px
 const MIN_PANE_H=24+6+4*MIN_CHART_H+3*2; // 276px
 
+// ================= KONTROL RESIZE PANE (tombol +/-/maks) =================
+// Masalah: pane III adalah pane TERAKHIR di #vizScroll; menarik handle di bawahnya
+// menambah scrollHeight sehingga handle selalu "mentok" di tepi bawah viewport
+// (terukur: roomToMoveDown=0px, ~140 siklus scroll+drag hanya untuk +300px).
+// Solusi: tombol +/− yang selalu terlihat (di-anchor ke ATAS pane) dan aksi
+// maksimalkan sekali-klik, sehingga memperbesar tidak bergantung pada ruang
+// kosong di bawah pane terbawah.
+
+const PANE_STEP=60;                 // langkah perbesar/perkecil (px)
+const PANE_MAX_RATIO=0.85;          // batas atas: 85% tinggi viewport
+// Maksimalkan memakai batas atas yang SAMA, supaya tombol + tidak pernah
+// mengecilkan pane yang sedang dimaksimalkan (dulu 0.9 > 0.85 → + mengecilkan).
+const MAXIMIZE_RATIO=PANE_MAX_RATIO;
+const DRAG_EDGE_ZONE=48;            // px dari tepi bawah viewport → auto-scroll
+const DRAG_SCROLL_SPEED=14;         // px per langkah auto-scroll
+// Tinggi tersimpan per pane saat maksimalkan, supaya bisa dipulihkan.
+const paneSavedHeight={};
+
+function paneMaxH(){
+  const vs=document.getElementById('vizScroll');
+  const vh=(vs&&vs.clientHeight)||window.innerHeight;
+  return Math.max(MIN_PANE_H+PANE_STEP,Math.round(vh*PANE_MAX_RATIO));
+}
+
+function updatePaneSizeLabel(id){
+  const el=document.querySelector('[data-pane-size="'+id+'"]');
+  const p=document.getElementById(id);
+  if(el&&p)el.textContent=Math.round(p.offsetHeight)+'px';
+}
+
+// Ubah tinggi satu pane sebesar dir*PANE_STEP, dijepit [MIN_PANE_H, paneMaxH()].
+function resizePane(id,dir){
+  const p=document.getElementById(id);
+  if(!p)return;
+  const cur=p.offsetHeight;
+  const nH=Math.min(paneMaxH(),Math.max(MIN_PANE_H,cur+dir*PANE_STEP));
+  if(nH===cur)return;
+  p.style.height=nH+'px';
+  // Mode maksimalkan dibatalkan bila ukuran diubah manual.
+  p.classList.remove('zoomed');
+  delete paneSavedHeight[id];
+  updatePaneSizeLabel(id);
+  scheduleTimeChartResize();
+}
+
+// Sekali-klik: maksimalkan pane (90% viewport), klik lagi untuk pulihkan.
+function toggleMaximizePane(id){
+  const p=document.getElementById(id);
+  if(!p)return;
+  if(p.classList.contains('zoomed')&&paneSavedHeight[id]){
+    p.style.height=paneSavedHeight[id]+'px';
+    p.classList.remove('zoomed');
+    delete paneSavedHeight[id];
+  }else{
+    paneSavedHeight[id]=p.offsetHeight;
+    p.style.height=Math.round(((document.getElementById('vizScroll')||{}).clientHeight||window.innerHeight)*MAXIMIZE_RATIO)+'px';
+    p.classList.add('zoomed');
+  }
+  updatePaneSizeLabel(id);
+  scheduleTimeChartResize();
+  // Pastikan pane yang dimaksimalkan terlihat.
+  if(p.scrollIntoView)p.scrollIntoView({block:'nearest'});
+}
+
+// Perbarui label ukuran sekali setelah boot (dan tiap drag berakhir).
+function initPaneResizeControls(){
+  ['pane1','pane2','pane3'].forEach(updatePaneSizeLabel);
+}
+
 // Seri tiap chart untuk legenda. Warna = warna semantik default (kondisi normal);
 // dipakai sebagai overlay kecil di sudut kanan-atas wrapper sehingga tidak
 // memakan tinggi area plot (penting karena tiap chart hanya >=MIN_CHART_H px).
@@ -2587,6 +2692,9 @@ function initDragHandles(){
       drag=document.getElementById(h.dataset.pane);
       if(!drag)return;
       sy=e.clientY;sh=drag.offsetHeight;
+      // Cegah klik tak sengaja pada tombol yang kebetulan berada di bawah
+      // kursor saat drag (tombol animasi Fasor/Realistis, kontrol pane-resize).
+      document.body.classList.add('is-dragging');
       e.preventDefault();
     });
   });
@@ -2594,18 +2702,26 @@ function initDragHandles(){
     if(!drag)return;
     // Lantai = MIN_PANE_H (lantai konten 4 chart), bukan angka arbitrer,
     // supaya pane tidak bisa menyusut melebihi kemampuan layoutnya.
-    const nH=Math.max(MIN_PANE_H,sh+(e.clientY-sy));
+    const nH=Math.min(paneMaxH(),Math.max(MIN_PANE_H,sh+(e.clientY-sy)));
     drag.style.height=nH+'px';
-    // Sengaja TIDAK menulis vizScroll.scrollTop di sini: dulu itu mem-pin posisi
-    // scroll tiap mousemove sehingga melawan kursor dan membuat tarikan berat.
+    // AUTO-SCROLL: pane terakhir tidak punya ruang kosong di bawahnya, jadi saat
+    // kursor mendekati tepi bawah viewport kita gulirkan container agar handle
+    // tetap terlihat dan pane bisa terus membesar (dulu: mentok, roomToMove=0).
+    const vs=document.getElementById('vizScroll');
+    if(vs&&e.clientY>window.innerHeight-DRAG_EDGE_ZONE){
+      vs.scrollTop+=DRAG_SCROLL_SPEED;
+    }
     e.preventDefault();
   });
   document.addEventListener('mouseup',()=>{
     if(!drag)return;
+    const id=drag.id;
     drag=null;
+    document.body.classList.remove('is-dragging');
     // Resize chart sekali di akhir drag (bukan tiap mousemove) supaya backing
     // store canvas ikut ukuran baru tanpa layout thrashing.
     scheduleTimeChartResize();
+    updatePaneSizeLabel(id);
   });
 
   // Viewport berubah (mis. jendela di-resize / zoom) juga mengubah lebar chart.
@@ -2858,6 +2974,7 @@ window.addEventListener('load',()=>{
   S=makeState();
   initDragHandles();
   initTimeCharts();
+  initPaneResizeControls();
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
   drawRLRChart(S);
 

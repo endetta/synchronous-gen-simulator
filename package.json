@@ -5,7 +5,7 @@
   "main": "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html",
   "scripts": {
     "start": "python -m http.server 8000",
-    "test": "node tools/model.test.js && node tools/ui.test.js && node tools/chart-scale.test.js",
+    "test": "node tools/model.test.js && node tools/governor-steady-state.test.js && node tools/eac-verdict.test.js && node tools/oos-trip.test.js && node tools/end-to-end.test.js && node tools/ui.test.js && node tools/chart-scale.test.js && node tools/reactive-power.test.js && node tools/interaction-a11y.test.js",
     "test:console": "echo 'Copy tools/console-test-runner.js to browser console'",
     "test:puppeteer": "node tools/puppeteer-test-runner.js",
     "test:all": "npm run test && npm run test:puppeteer"
