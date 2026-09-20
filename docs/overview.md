@@ -199,8 +199,8 @@ fungsi yang hilang. Daftar fungsi wajib ada di konstanta `REQUIRED` di file itu.
 1. **UNSTABLE** — masih dalam pengembangan
 2. `resizeTimeCharts()` sengaja dinonaktifkan (layout thrashing) — chart tidak ikut membesar saat panel di-drag
 3. `smartDecimate()` bucket 50 ms tidak menjamin extrema/transien pendek terlihat
-4. Tooltip hover-only (belum ada dukungan sentuh/keyboard)
-5. Chart.js dimuat dari CDN — butuh koneksi saat pertama kali dibuka
+4. Chart.js dimuat dari CDN — butuh koneksi saat pertama kali dibuka
+5. EAC_TOL 2% lebih kecil dari galat diskretisasi A₁ pada kasus ambang (temuan 9.1 audit adversarial — lihat `.scratch/sync-gen-fixes/issues/09-*`)
 
 ## Future Enhancements
 
