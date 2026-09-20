@@ -28,6 +28,7 @@ Ditulis terhadap commit `ddcca16` di branch `fix/critical-governor-and-bugs`.
 | [06](06-cleanup-stale-artifacts.md) | Bersihkan artefak stale | — (butir-1 perlu konfirmasi) | ready-for-agent |
 | [07](07-interaction-a11y.md) | Interaksi & aksesibilitas | — | ready-for-agent |
 | [08](08-end-to-end-test-coverage.md) | Coverage tes fitur inti (regresi gate) | 02 | ready-for-agent |
+| [09](09-audit-adversarial-fisika-2026-09-20.md) | Audit adversarial fisika (EAC live-params, RLR handoff, OOS post-trip) | — | findings-only |
 
 Status: `ready-for-agent` | `in-progress` | `done` | `blocked` (dengan alasan) | `rejected` (dengan alasan).
 
