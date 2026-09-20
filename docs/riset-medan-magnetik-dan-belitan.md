@@ -58,7 +58,7 @@ Yang terverifikasi dari sana: over-excitation "causes a demagnetizing effect due
 
 ### Yang masih belum terverifikasi
 
-- Tabel lengkap "armature reaction pada pf lagging/unity/leading" dalam bentuk kanonik (Kundur/Chapman) — **tidak berhasil saya buka langsung sesi ini.** Yang bisa saya berikan adalah turunan dari relasi Kirtley yang terverifikasi (§4.4), ditandai sebagai turunan, bukan kutipan.
+- ~~Tabel lengkap "armature reaction pada pf lagging/unity/leading" dalam bentuk kanonik (Kundur/Chapman).~~ **Diperbarui 2026-09-20:** rumus `I_d` kini **kutipan langsung** Kirtley Ch.4 §9, dan tabelnya didukung rantai verifikasi tiga sumber (§4.4). Kundur & Chapman tetap tidak terbuka — lihat §10 celah 1 & 2.
 - Nomor halaman pasti di buku cetak Kundur (1994) — saya hanya bisa mengutip Kirtley yang PDF-nya benar-benar saya buka.
 - Semua klaim tentang konstruksi fisik (frame, keybars, laminasi) — tidak relevan untuk penampang 2D dan tidak saya verifikasi.
 
@@ -326,9 +326,13 @@ Ini menyederhanakan implementasi secara besar: **path garis fluks bisa dihitung 
 
 ### 4.4 Distorsi karena beban (armature reaction)
 
-> **Status verifikasi:** dekomposisi d/q terverifikasi di Kirtley §9 (two-reaction theory). Pemetaan spesifik ke lagging/unity/leading di bawah ini adalah **turunan** dari relasi Kirtley, bukan kutipan langsung — saya tidak berhasil membuka sumber kanonik (Kundur/Chapman) untuk tabel itu sesi ini.
+> **Status verifikasi (diperbarui 2026-09-20):** rumus `I_d`/`I_q` di bawah adalah **kutipan langsung** Kirtley Ch.4 §9, bukan lagi turunan. Arah demagnetizing dikuatkan dua sumber independen (Kirtley §8 konvensi generator, Wikipedia "Synchronous machine"). Yang **masih** bukan kutipan: tabel kanonik dalam bentuk Kundur/Chapman — kedua buku itu tidak saya buka. Kirtley Ch.5 dan Ch.9 sudah diperiksa dan **tidak** memuat tabel armature reaction (lihat §10 celah 1), jadi tabel di bawah adalah rakitan dari relasi yang dikutip, bukan kutipan tabel.
 
-Kirtley §9 memisahkan arus stator menjadi dua komponen:
+Kirtley §9 memisahkan arus stator menjadi dua komponen. Sumbernya menyatakan transisi ini secara eksplisit:
+
+> "which is easily inverted to produce: Vcos δ Id = Eaf Xd / Vsin δ Iq = Xq"
+
+(Teks PDF hasil ekstraksi `tools/pdf-text.js` kehilangan pemisah pecahan — mesin PDF menulisnya sebagai satu baris. Bentuk pecahannya adalah dua rumus berikut, dan itulah yang dipakai di seluruh dokumen ini.)
 
 ```
 I_d = (V cos δ − E_af)/X_d
@@ -354,15 +358,31 @@ Komponen `I_d` adalah proyeksi arus stator pada **sumbu medan**. Inilah yang mel
 
 Tanda `I_d` ditentukan oleh `(V cos δ − E_af)`. Karena `E_af` sebanding dengan eksitasi:
 
-| Kondisi | `E_af` relatif | `I_d` | Armature reaction | Q (konvensi simulator) | pf |
+| Kondisi | `E_af·cos δ` vs `V` | `I_d` | Armature reaction | Q (konvensi simulator) | pf |
 |---|---|---|---|---|---|
 | Overexcited | `E_af·cos δ > V` | negatif | **demagnetizing** | `Q > 0` | lagging |
-| Normal | `E_af·cos δ = V` | nol | tidak ada | `Q = 0` | unity |
+| Normal | `E_af·cos δ = V` | nol | tidak ada (cross-axis semua) | `Q = 0` | unity |
 | Underexcited | `E_af·cos δ < V` | positif | **magnetizing** | `Q < 0` | leading |
 
-Halaman Wikipedia "Synchronous machine" mengonfirmasi arah satu sel ini: over-excitation "causes a **demagnetizing** effect due to armature reaction". Baris lainnya adalah turunan konsisten dari relasi Kirtley di atas.
+**Rantai verifikasi yang konsisten (diperbarui 2026-09-20):**
+
+1. **Rumus `I_d`** adalah kutipan langsung Kirtley Ch.4 §9: `I_d = (V cos δ − E_af)/X_d`.
+2. **Overexcited** ⟹ `E_af` besar ⟹ `E_af·cos δ > V` ⟹ `I_d < 0`.
+3. **Fluks d-axis** (Kirtley §9): `λ_d = L_d·I_d + M·I_f`. Dengan `I_d < 0` dan `M·I_f > 0` (medan rotor menambah fluks d), fluks `λ_d` berkurang → **demagnetizing**.
+4. **Konfirmasi independen — Kirtley §8:** "This picture represents operation as a generator, so the signs of p and q are reversed" dan "large synchronous generators typically have a problem with heating of the stator iron when they attempt to operate in highly underexcited conditions (**q strongly negative**)". Dengan `q` strongly negative pada underexcited, dan `q = (V² − V·E_af·cos δ)/X_d` (Kirtley §7, motor convention — simulator memakai `getQe = Vt(Ef·cos δ − Vt)/Xs`, beda tanda konvensi, bukan bug), maka:
+   - Overexcited ⟹ `E_af·cos δ > V` ⟹ `getQe > 0` ⟹ `Q > 0` ⟹ pf lagging. ✓
+   - Underexcited ⟹ `E_af·cos δ < V` ⟹ `getQe < 0` ⟹ `Q < 0` ⟹ pf leading. ✓
+5. **Konfirmasi independen — Wikipedia "Synchronous machine":** "When the motor is over excited, the back emf will be greater than the motor terminal voltage. This causes a demagnetizing effect due to armature reaction." (Motor convention, tapi arah demagnetizing terhadap `I_d` tidak bergantung pada frame referensi — lihat catatan di bawah.)
+
+Halaman Wikipedia "Synchronous machine" mengonfirmasi arah demagnetizing pada sel satu (overexcited = demagnetizing). Sel lainnya (underexcited = magnetizing, unity = nol komponen d) adalah konsekuensi langsung dan konsisten dari rumus Kirtley §9 di atas. **Yang belum ada sebagai kutipan tabel:** formulir kanonik Kundur/Chapman — dua buku itu tidak saya buka (lihat §10 celah 1 & 2).
 
 **Konsistensi internal yang harus dijaga:** tabel ini harus cocok dengan `getQe` dan `getPFNature` di simulator. `getQe > 0` (lagging) harus memetakan ke `I_d` negatif (demagnetizing). Kalau implementasi visualisasi menunjukkan arah sebaliknya, ada bug.
+
+**Dua catatan halus yang mudah salah saat implementasi (ditambahkan 2026-09-20):**
+
+**(a) Unity pf bukan berarti "tidak ada reaksi sama sekali".** Saat `I_d = 0`, reaksi armature tidak hilang — ia **sepenuhnya cross-axis** (`I_q ≠ 0`). Menurut `λ_d = L_d·I_d + M·I_f` dan `λ_q = L_q·I_q`, fluks d-axis memang tidak berubah besarnya, tapi fluks q-axis muncul dan **memutar** resultan menjauh dari sumbu-d. Efek visualnya: pola fluks tidak memudar, tapi **miring**. Kalau implementasi menggambar "fluks menghilang" di unity pf, itu salah. Tabel di atas menandai sel ini "(cross-axis semua)" karena alasan ini.
+
+**(b) Label lagging/leading bertukar antara frame motor dan generator.** Wikipedia dan Kirtley §7 berbicara dalam **motor reference coordinates**; simulator (`getQe`, `getPFNature`) memakai **generator**. Yang **tidak** bergantung frame adalah pemetaan **`I_d` → demagnetizing/magnetizing** (itu soal tanda arus relatif terhadap medan, murni geometris). Yang **bergantung** frame adalah label pf. Jadi jangan mengutip "overexcited = lagging" dari sumber motor dan menganggapnya berlaku langsung — yang berlaku langsung adalah "overexcited ⟹ `I_d < 0` ⟹ demagnetizing". Kolom pf di tabel ini sudah dalam frame generator karena sudah dicocokkan dengan `getPFNature` simulator.
 
 **Yang boleh dan tidak boleh dilakukan secara visual:** distorsi ini **halus**. Kirtley §9 menegaskan untuk mesin round-rotor `X_d ≈ X_q` sehingga pengaruh saliency kecil. Jadi efek visual armature reaction yang jujur adalah **pergeseran resultan beberapa derajat dan perubahan kerapatan sedikit** — bukan pembelokan dramatis. Animasi yang menunjukkan distorsi besar akan melebih-lebihkan fisika.
 
@@ -709,10 +729,10 @@ Semua nomor baris merujuk `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).
 
 Dinyatakan terbuka, bukan didiamkan:
 
-1. **Tabel armature reaction lagging/unity/leading dalam bentuk kanonik** — saya turunkan dari relasi Kirtley (§4.4), tapi tidak berhasil membuka Kundur atau Chapman langsung. Turunan itu konsisten, tapi bukan kutipan. **Perlu verifikasi sebelum dipakai sebagai klaim otoritatif.**
+1. **Tabel armature reaction lagging/unity/leading dalam bentuk kanonik** — **DITUTUP** (2026-09-20). Rumus `I_d` adalah kutipan langsung Kirtley Ch.4 §9, dan seluruh tabel kini didukung oleh rantai verifikasi tiga sumber (Kirtley §9 → λd demagnetizing → Wikipedia/Kirtley §8). Yang **belum** tersedia sebagai kutipan tabel: dari Kundur (1994) atau Chapman. Karena kedua buku tidak dapat diakses, tabel tetap merupakan "rakitan kutipan" bukan "kutipan tabel" — lihat banner §4.4 yang diperbarui.
 2. **Nomor halaman Kundur (1994)** untuk setiap rumus — tidak bisa dikutip karena bukunya tidak saya buka.
 3. **Konvensi dot/cross** — saya jelaskan sebagai konsekuensi pernyataan Kirtley tentang sense +z/−z, tapi tidak menemukan sumber yang menyatakan konvensinya secara eksplisit.
 4. **Konstanta kelengkungan `k = 0.55`** di §7.2 adalah tebakan yang perlu disetel visual, bukan nilai dari sumber.
 5. **Performa SVG pada perangkat nyata** — MDN memberi anggaran 16.7 ms dan prinsip transform-vs-`d`, tapi tidak ada pengukuran di mesin target. Perlu diukur dengan DevTools setelah implementasi.
 6. **`will-change`** — MDN tidak membahasnya di halaman yang saya buka; tidak direkomendasikan tanpa dasar.
-7. **Chapter 9 Kirtley (Synchronous Machine Simulation Models)** — PDF-nya terdaftar di OCW tapi belum saya ekstrak. Kemungkinan berisi model dinamis yang lebih lengkap daripada yang dipakai simulator.
+7. ~~**Chapter 9 Kirtley (Synchronous Machine Simulation Models)** — PDF-nya terdaftar di OCW tapi belum saya ekstrak.~~ **DITUTUP** (2026-09-20): sudah diekstrak dengan `tools/pdf-text.js` dan dibaca penuh. Isinya Park's Transformation, matriks induktansi, normalisasi per-unit (equal-mutuals base), rangkaian ekivalen sumbu-d, model elektromekanis tereduksi, dan model PM. **Tidak memuat tabel armature reaction** — pencarian eksplisit untuk "armature", "lagging", "leading", "demagnetizing" tidak menemukan apa pun. Chapter 5 (Winding Inductances) juga diperiksa: hanya winding factor/pitch factor/breadth factor/harmonisa MMF. Jadi tidak ada chapter Kirtley lain yang menyediakan tabel kanonik yang dicari di celah #1.

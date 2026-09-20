@@ -160,8 +160,9 @@ kumparan — bukan titik.
 - [ ] Saat `sc_active`, garis fluks **TIDAK** mengerut (asas constant flux linkage)
 - [ ] Tidak ada lagi `Date.now()` di jalur animasi mode realistis
 
-**Prasyarat verifikasi:** sebelum menulis kode, konfirmasi tabel armature reaction di riset §4.4
-(turunan dari Kirtley, belum diverifikasi ke Kundur/Chapman — lihat riset §10 celah #1).
+**Prasyarat verifikasi:** tabel armature reaction di riset §4.4 — **TERVERIFIKASI** (2026-09-20).
+Rumus `I_d` adalah kutipan langsung Kirtley Ch.4 §9; tabel didukung tiga sumber (Kirtley §9 +
+§8, Wikipedia). Kedua buku (Kundur/Chapman) tetap tidak terbuka — lihat riset §10 celah 1 & 2.
 
 ---
 
@@ -624,12 +625,14 @@ test('rotor field intensity scales with Ef', () => {
 
 ---
 
-**Status:** DRAF (direvisi 2026-09-20) — menunggu approval untuk mulai implementasi Fase 0
+**Status:** DRAF (direvisi 2026-09-20) — **prasyarat verifikasi sudah tertutup**, menunggu approval user untuk mulai implementasi Fase 0
 **Next step:**
-1. Konfirmasi tabel armature reaction (riset §4.4) — masih turunan, belum diverifikasi ke Kundur
-2. Review plan Fase 0 dengan user
+1. ~~Konfirmasi tabel armature reaction (riset §4.4)~~ — **SELESAI 2026-09-20**: kutipan langsung Kirtley Ch.4 §9 + rantai verifikasi tiga sumber
+2. Review plan Fase 0 dengan user — **belum ada approval untuk mulai coding**
 3. Implementasi Fase 0 dengan TDD; tambah `tools/` test untuk kontrak `#g-flux` dan `#g-rmf`
 
 **Catatan sesi 2026-09-20:** riset primer selesai, dokumen di
 `docs/riset-medan-magnetik-dan-belitan.md`. Plan ini direvisi berdasarkan temuan itu —
-lihat bagian "KOREKSI TERHADAP VERSI DRAF 2026-09-09" di atas.
+lihat bagian "KOREKSI TERHADAP VERSI DRAF 2026-09-09" di atas. Verifikasi §4.4 ditutup
+sesi yang sama; dua catatan halus ditambahkan (unity pf = cross-axis, bukan "tidak ada";
+label pf bertukar antar frame motor/generator).
