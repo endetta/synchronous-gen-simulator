@@ -1624,9 +1624,11 @@ function initTimeCharts(){
   // Create chart wrappers - bottom chart will have x-axis
   for(let i=0;i<4;i++){
     const wrapper=document.createElement('div');
-    wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:60px;overflow:hidden;';
+    wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:'+MIN_CHART_H+'px;overflow:hidden;';
     wrapper.innerHTML=`<canvas style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>`;
     container.appendChild(wrapper);
+    // Legenda seri overlay (tidak memakan tinggi plot)
+    buildSeriesLegend(wrapper,SERIES_LEGEND[i]);
   }
 
   // Insert container before drag-handle (so label and handle stay on top)
@@ -1749,12 +1751,62 @@ function initTimeCharts(){
   resizeTimeCharts();
 }
 
-let timeChartsResizeCounter=0;
-let lastChartW=0, lastChartH=0;
+// Tinggi minimum satu chart (px) — satu sumber kebenaran, dipakai oleh
+// min-height wrapper DAN lantai tinggi pane, supaya pane tidak bisa menyusut
+// melebihi kemampuan layoutnya (dulu: min-height 60px vs lantai drag 120px,
+// sehingga chart ke-4 terpotong).
+const MIN_CHART_H=60;
+// Lantai konten container chart = padding atas 24 + bawah 6 + 4 chart + 3 gap 2px
+const MIN_PANE_H=24+6+4*MIN_CHART_H+3*2; // 276px
+
+// Seri tiap chart untuk legenda. Warna = warna semantik default (kondisi normal);
+// dipakai sebagai overlay kecil di sudut kanan-atas wrapper sehingga tidak
+// memakan tinggi area plot (penting karena tiap chart hanya >=MIN_CHART_H px).
+const SERIES_LEGEND=[
+  [{t:'δ',c:'#806000'}],
+  [{t:'Δω',c:'#3a6818'}],
+  [{t:'Pe',c:'#006898'},{t:'Pm',c:'#b85800'},{t:'Qe',c:'#6040a0'}],
+  [{t:'f',c:'#0a7040'},{t:'fnom',c:'#ccd2e0'}]
+];
+
+// Bangun legenda overlay untuk satu wrapper chart (pointer-events:none agar
+// tidak menghalangi tooltip/hover Chart.js).
+function buildSeriesLegend(wrapper,items){
+  if(!items||!items.length)return;
+  const el=document.createElement('div');
+  el.setAttribute('data-series-legend','true');
+  el.style.cssText='position:absolute;top:3px;right:5px;z-index:4;display:flex;gap:7px;pointer-events:none;background:rgba(255,255,255,.82);padding:1px 4px;border-radius:2px;font-family:var(--mono);font-size:9.5px;line-height:1.4;';
+  el.innerHTML=items.map(function(it){
+    return '<span class="legend-item" style="display:flex;align-items:center;gap:3px;color:'+it.c+'">'
+      +'<span style="display:inline-block;width:9px;height:2.5px;border-radius:1px;background:'+it.c+'"></span>'
+      +it.t+'</span>';
+  }).join('');
+  wrapper.appendChild(el);
+}
+
+// Resize eksplisit keempat chart ke ukuran kotak CSS-nya saat ini.
+// responsive:false hanya mematikan resize OTOMATIS Chart.js; chart.resize()
+// tetap sah dan menangani devicePixelRatio sendiri (retinaScale), jadi teks
+// tetap tajam di layar HiDPI. Chart yang ukurannya tidak berubah dilewati.
 function resizeTimeCharts(){
-  // DISABLED: Chart resize causes layout thrashing and autoscroll
-  // Charts are sized once at init and never resized during animation loop
-  return;
+  for(const k in timeCharts){
+    const c=timeCharts[k];
+    if(!c||!c.canvas||!c.canvas.parentElement)continue;
+    const box=c.canvas.parentElement;
+    const w=Math.round(box.clientWidth),h=Math.round(box.clientHeight);
+    if(w<1||h<1)continue;
+    if(c.width===w&&c.height===h)continue;
+    c.resize(w,h);
+  }
+}
+
+// Resize dijadwalkan paling banyak sekali per frame (coalesced) supaya satu
+// tarikan drag tidak memicu layout berulang kali dalam frame yang sama.
+let chartResizeScheduled=false;
+function scheduleTimeChartResize(){
+  if(chartResizeScheduled)return;
+  chartResizeScheduled=true;
+  requestAnimationFrame(()=>{chartResizeScheduled=false;resizeTimeCharts();});
 }
 
 let lastChartCommit=0;
@@ -2196,9 +2248,11 @@ function renderAll(){
   updateHdr();
 
   // Only skip Chart.js updates during scroll (this is what causes autoscroll)
+  // resizeTimeCharts() is intentionally NOT called here: it is coalesced via
+  // scheduleTimeChartResize() and fires on drag-end / layout change only,
+  // so it cannot thrash layout on every animation frame.
   if(!isUserScrolling){
     drawTime();
-    resizeTimeCharts();
   }
 }
 function loop(ts){
@@ -2312,42 +2366,35 @@ function togglePane(n){
 // ================================================================
 function initDragHandles(){
   let drag=null,sy=0,sh=0;
-  const vizScroll=document.getElementById('vizScroll');
-  let lockedScrollTop=0;
 
   document.querySelectorAll('.drag-handle').forEach(h=>{
     h.addEventListener('mousedown',e=>{
       drag=document.getElementById(h.dataset.pane);
+      if(!drag)return;
       sy=e.clientY;sh=drag.offsetHeight;
-      if(vizScroll)lockedScrollTop=vizScroll.scrollTop;
       e.preventDefault();
     });
   });
   document.addEventListener('mousemove',e=>{
     if(!drag)return;
-    const nH=Math.max(120,sh+(e.clientY-sy));
+    // Lantai = MIN_PANE_H (lantai konten 4 chart), bukan angka arbitrer,
+    // supaya pane tidak bisa menyusut melebihi kemampuan layoutnya.
+    const nH=Math.max(MIN_PANE_H,sh+(e.clientY-sy));
     drag.style.height=nH+'px';
-    // Lock scroll position during drag to prevent autoscroll
-    // Only update if user is NOT actively scrolling
-    if(vizScroll && !isUserScrolling){
-      vizScroll.scrollTop=lockedScrollTop;
-    }
+    // Sengaja TIDAK menulis vizScroll.scrollTop di sini: dulu itu mem-pin posisi
+    // scroll tiap mousemove sehingga melawan kursor dan membuat tarikan berat.
     e.preventDefault();
   });
   document.addEventListener('mouseup',()=>{
+    if(!drag)return;
     drag=null;
-    // Only restore scroll if user wasn't scrolling
-    // This prevents forcing scroll back during/after user scroll
-    if(vizScroll && !isUserScrolling){
-      const finalScroll=lockedScrollTop;
-      setTimeout(()=>{
-        // Double-check that user still isn't scrolling
-        if(!isUserScrolling){
-          vizScroll.scrollTop=finalScroll;
-        }
-      },50);
-    }
+    // Resize chart sekali di akhir drag (bukan tiap mousemove) supaya backing
+    // store canvas ikut ukuran baru tanpa layout thrashing.
+    scheduleTimeChartResize();
   });
+
+  // Viewport berubah (mis. jendela di-resize / zoom) juga mengubah lebar chart.
+  window.addEventListener('resize',scheduleTimeChartResize);
 }
 
 // ================================================================
