@@ -654,7 +654,7 @@ function setNarr(t){S.narr=t;document.getElementById('narrtxt').textContent=t;}
 function autoNarr(s){
   if(s._scnarr)return;
   const Pmax=s.Ef*s.V/s.Xs,Pe=getPe(s);
-  const Pm_eff=Math.min(Math.max(s.Pm+s.Pm_gov,0),3.5);
+  const Pm_eff=getPmEff(s);
   const d_s=Math.asin(Math.min(Pm_eff/Pmax,0.9999))*R2D,d_cr=180-d_s;
   const ddeg=s.delta*R2D,acc=Pm_eff-Pe;
   if(s.sc_active){setNarr(`FAULT AKTIF. Pe=${Pe.toFixed(4)} pu. ΔP=${acc.toFixed(3)} pu → rotor dipercepat. δ=${ddeg.toFixed(1)}°. δ_cr=${d_cr.toFixed(1)}°.`);return;}
@@ -2453,6 +2453,11 @@ function loop(ts){
 // CONTROLS
 // ================================================================
 function setMode(m){
+  // Bumpless transfer: saat governor mulai aktif (masuk island), seed Pm_gov/Xg
+  // dengan setpoint saat itu supaya daya mekanik tidak lompat ke 0 sesaat.
+  if(m==='island'&&S.mode!=='island'&&!rlr_running){
+    S.Xg=Math.max(0,S.Pm);S.Pm_gov=Math.max(0,S.Pm);
+  }
   S.mode=m;
   document.getElementById('bGrid').classList.toggle('on',m==='grid');
   document.getElementById('bIsland').classList.toggle('on',m==='island');
@@ -2686,7 +2691,9 @@ function startRLR(){
   S.Pm=getRLRLoad(0);
   const Pmax=S.Ef*S.V/S.Xs;
   S.delta=Math.asin(Math.min(Math.max(S.Pm/Pmax,-.9999),.9999));
-  S.omega=0;S.Xg=0;S.Pm_gov=0;
+  // Bumpless: governor masuk dengan daya = beban awal, bukan 0 — kalau tidak,
+  // Pm_eff jatuh ke nol sesaat dan rotor langsung deselerasi.
+  S.omega=0;S.Xg=S.Pm;S.Pm_gov=S.Pm;
   ['sPm','nPm','adj-pm-dn','adj-pm-up'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
   rlr_running=true;
   document.getElementById('btn-rlr-s').style.display='none';
