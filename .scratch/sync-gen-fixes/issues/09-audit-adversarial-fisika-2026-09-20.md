@@ -158,3 +158,40 @@ perlu keputusan:
 > diekstrak dari *reasoning yang berhasil dieksekusi* + konfirmasi empiris
 > mandiri; **bukan** output terstruktur yang divalidasi. Temuan yang belum
 > dikonfirmasi (9.3–9.5, 9.8–9.11) perlu verifikasi ulang bila dipilih untuk diproses.
+
+---
+
+## RESOLUSI (2026-09-21/22) — semua temuan fix/perlakuan
+
+Seluruh temuan 9.1–9.11 diproses; dung status per butir + bukti commit.
+Detail perbaikan ada di log sesi `design-plans/sesi-2026-09-21-02-tiket-09-*.md`.
+
+| Butir | Status | Bukti commit |
+|-------|--------|--------------|
+| 9.1 | **DOKUMENTASI** — galat numerik A₁ (L-RAM) melebihi toleransi 2% pada fault pendek; diverifikasi ulang (6%/5%/4%/3% utk 0.12/0.15/0.18/0.25 s, selalu underestimate → condong STABIL) | `4d91b40` |
+| 9.2 | **FIX** — verdict EAC beku pada snapshot parameter saat clearing (geser slider pasca-event tidak mengubah verdict) | `80d276a` |
+| 9.3 | **FIX** — badge/narasi SC dibersihkan saat trip (sc_active/sc_on false, eac_phase fault→done, evts dikosongkan) | `de4495d` |
+| 9.4 | **DIMINIMALKAN** — overshoot ambang 160° kecil pada skenario standar (0.2°); pengecekan per-substep tidak perlu | tiket 04 (`9cf279f`) |
+| 9.5 | **FIX (keputusan UX)** — beku s.anim saat trip (visual medan berhenti) | `de4495d` |
+| 9.6 | **FIX** — guard slidersFrozen() di onSl/numSl/adjSl + freezeSliders() saat trip, lepas saat reset | `de4495d` |
+| 9.7 | **FIX** — handoff RLR→grid bumpless: setpoint grid = daya termal aktual saat handoff (lompatan −0.1195 → 0.0000 pu) | `351eda0` |
+| 9.8 | **FIX** — stopRLR() sinkron slider/number Pm ke setpoint handoff via uiSl('Pm',S.Pm) | `351eda0` |
+| 9.9 | **FIX** — klik Grid saat RLR aktif kini menghentikan RLR (guard di setMode) | `351eda0` |
+| 9.11 | **FIX** — getACtx() memanggil ac.resume() saat suspended | `4d91b40` |
+
+Keputusan yang diambil: 9.4/9.5/9.9 diselesaikan sebagai bagian proses (9.4 bukan
+bug nyata pada skenario standar, 9.5/9.9 adalah keputusan UX yang disetujui user).
+Pekerjaan terutang: **9.1 memperbaiki integrasi A₁ ke midpoint** bila verdict ambang
+menjadi concern — saat ini hanya didokumentasikan, bukan diubah (mengubah integrasi
+berisiko menggeser verdict semua preset).
+
+### Tes baru (RED→GREEN)
+- `tools/eac-snapshot.test.js` (9.2, 5 assertion)
+- `tools/post-trip-freeze.test.js` (9.3/9.5/9.6, 8 assertion)
+- `tools/rlr-handoff.test.js` (9.7/9.8/9.9, 8 assertion)
+- Seam `tools/extract.js` kini ekspor `snapEac`/`freezeSliders`/`slidersFrozen`
+
+### Verifikasi
+- Suite penuh: model, governor-steady-state, eac-verdict, oos-trip, eac-snapshot,
+  post-trip-freeze, rlr-handoff, ui, interaction-a11y, realistic-field — **semua PASS**
+- End-to-end: 38/38 PASS

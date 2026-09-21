@@ -28,8 +28,24 @@ Ditulis terhadap commit `ddcca16` di branch `fix/critical-governor-and-bugs`.
 | [06](06-cleanup-stale-artifacts.md) | Bersihkan artefak stale | — | done (`e254113`) |
 | [07](07-interaction-a11y.md) | Interaksi & aksesibilitas | — | done (`62ca22d`, `e422ece`) |
 | [08](08-end-to-end-test-coverage.md) | Coverage tes fitur inti (regresi gate) | 02 | done (`15b8f04`) |
-| [09](09-audit-adversarial-fisika-2026-09-20.md) | Audit adversarial fisika (EAC live-params, RLR handoff, OOS post-trip) | — | in-progress (2026-09-21) |
+| [09](09-audit-adversarial-fisika-2026-09-20.md) | Audit adversarial fisika (EAC live-params, RLR handoff, OOS post-trip) | — | done (`80d276a`, `de4495d`, `351eda0`, `4d91b40`; lihat resolusi di tiket) |
+| 9.1 | Dokumentasikan batas akurasi EAC_TOL | — | done (`4d91b40`) |
+| 9.2 | Snapshot parameter EAC saat clearing | — | done (`80d276a`) |
+| 9.3 | SC badge/narasi stale pasca-trip | — | done (`de4495d`) |
+| 9.4 | Overshoot ambang 160° | — | ditutup (0.2° di skenario standar) |
+| 9.5 | Bekukan anim post-trip | keputusan UX | done (`de4495d`) |
+| 9.6 | Bekukan readout header post-trip | 9.5 | done (`de4495d`) |
+| 9.7 | RLR→grid handoff −0.126 pu | — | done (`351eda0`) |
+| 9.8 | Slider Pm tidak sync pasca stopRLR | 9.7 | done (`351eda0`) |
+| 9.9 | Klik Grid saat RLR aktif desinkonsistensi | — | done (`351eda0`) |
+| 9.11 | Audio alarm tidak bisa diputar (Chrome) | — | done (`4d91b40`) |
 | [10](10-freq-chart-alignment-backlog.md) | Frekuensi chart: alignment sumbu & toleransi stabilizer | keputusan user | backlog |
+
+> Sub-item 9.1–9.11 (baris di atas) semuanya selesai 2026-09-21/22; ringkasan resolusi
+> ada di akhir `09-audit-adversarial-fisika-2026-09-20.md`, detail di
+> `design-plans/sesi-2026-09-21-02-tiket-09-perbaikan-audit.md`.
+
+> Sub-item tiket 09 (9.1–9.11) dilacak di tabel atas; tiket utama 09 tetap in-progress sampai semua fixed + log sesi + push.
 
 Status: `ready-for-agent` | `in-progress` | `done` | `blocked` (dengan alasan) | `rejected` (dengan alasan).
 
