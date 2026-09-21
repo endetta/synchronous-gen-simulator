@@ -514,6 +514,10 @@ function makeState(){
     hist:[], hlast:-1e9, anim:0,
     delta_sc_start:0, delta_cleared:0,
     A1_num:0, A2_num:0, eac_phase:'none',
+    // Snapshot parameter pada saat SC clear (tiket 09.2): verdict EAC untuk event
+    // lampau TIDAK boleh berubah saat user menggeser slider Ef/Pm/Xs pasca-event.
+    // Fisika swing tetap memakai parameter live; hanya verdict/kartu yang beku.
+    eac_snap:null,
     particles:[], part_t:0,
     narr:'Sistem PLTU setimbang.', evts:[], ev_t0:0, _scnarr:false,
     _rlr_last_phase:'',
@@ -571,13 +575,24 @@ function getPmEff(s){
 // Toleransi 2% hanya untuk round-off RK4, bukan faktor kelonggaran ×0.8 yang lama.
 // (Kundur 1994 §11.2; Anderson & Fouad 2003 §2.4)
 const EAC_TOL=1.02;
+// Snapshot evaluasi EAC (tiket 09.2). Mencegat potongan akselerasi/decelerasi
+// area pemakai SLIDER LIVE (Ef/Pm/Xs) pasca-event. Verdict harus beku pada
+// parameter SAAT CLEAR — kalau tidak, kartu dan narasi berubah-ubah mood.
+function snapEac(s){
+  return {
+    Pmax: s.Ef * s.V / Math.max(s.Xs, 0.01),
+    Pm: getPmEff(s),
+    dc: s.delta_cleared,
+  };
+}
 function getA2Available(s){
   if(!(s.delta_cleared>0)) return 0;
-  const Pmax=s.Ef*s.V/Math.max(s.Xs,0.01);
-  const Pm=getPmEff(s);
+  // Saat event belum selesai (post/done), pakai snapshot clearing agar verdict
+  // konsisten untuk event itu. Saat masih fault, pakai nilai live.
+  const snap = (s.eac_phase==='post'||s.eac_phase==='done') && s.eac_snap ? s.eac_snap : snapEac(s);
+  const Pmax = snap.Pmax, Pm = snap.Pm, dc = snap.dc;
   const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
   const dcr=Math.PI-d0;
-  const dc=s.delta_cleared;
   if(dc>=dcr) return 0;                 // clearing sudah lewat δ_cr → tidak ada area tersisa
   return Pmax*(Math.cos(dc)-Math.cos(dcr))-Pm*(dcr-dc);
 }
@@ -650,8 +665,10 @@ function stepPhys(s,rdt){
       const dts=s.t-s.sc_t0;
       const was=s.sc_active;
       s.sc_active=dts>=s.sc_delay&&dts<s.sc_delay+s.sc_dur;
-      if(s.sc_active&&!was){s.delta_sc_start=s.delta;s.eac_phase='fault';s.A1_num=0;}
-      if(!s.sc_active&&was&&s.eac_phase==='fault'){s.delta_cleared=s.delta;s.eac_phase='post';}
+      if(s.sc_active&&!was){s.delta_sc_start=s.delta;s.eac_phase='fault';s.A1_num=0;s.eac_snap=null;}
+      // Snapshot saat clear (tiket 09.2): verdict EAC event ini dibekukan pada
+      // parameter saat clearing — geser slider pasca-event tidak mengubahnya.
+      if(!s.sc_active&&was&&s.eac_phase==='fault'){s.delta_cleared=s.delta;s.eac_snap=snapEac(s);s.eac_phase='post';}
       if(dts>s.sc_delay+s.sc_dur+1.5){s.sc_on=false;if(s.eac_phase==='post')s.eac_phase='done';}
     }else{s.sc_active=false;}
     // EAC area accumulation (numerical integration)
@@ -2662,7 +2679,7 @@ function trigSC(){
   S.sc_delay=+document.getElementById('scDelay').value||0.3;
   S.sc_dur=+document.getElementById('scDur').value||0.2;
   S.sc_on=true;S.sc_t0=S.t;
-  S.eac_phase='none';S.A1_num=0;S.A2_num=0;
+  S.eac_phase='none';S.A1_num=0;S.A2_num=0;S.eac_snap=null;
 }
 function doReset(full=true){
   document.getElementById('oos-warn').classList.remove('show');
@@ -2948,7 +2965,7 @@ function runSc(name){
   const Pmax=S.Ef*S.V/S.Xs;
   S.delta=Math.asin(Math.min(Math.max(S.Pm/Pmax,-.9999),.9999));
   S.omega=0;S.Xg=0;S.Pm_gov=0;S.t=0;S.hist=[];S.hlast=-1e9;lastChartCommit=0;
-  S.eac_phase='none';S.A1_num=0;S.A2_num=0;
+  S.eac_phase='none';S.A1_num=0;S.A2_num=0;S.eac_snap=null;
   S.evts=sc.evts.map(e=>({...e}));S.ev_t0=0;
   phasorReady=false;pdInit=false;
   // Reset chart scales for new scenario
