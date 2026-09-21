@@ -574,6 +574,18 @@ function getPmEff(s){
 // seberapa besar area deselerasi yang TERSEDIA sebelum rotor melewati δ_cr.
 // Toleransi 2% hanya untuk round-off RK4, bukan faktor kelonggaran ×0.8 yang lama.
 // (Kundur 1994 §11.2; Anderson & Fouad 2003 §2.4)
+//
+// BATAS AKURASI (audit adversarial 2026-09-20, temuan 9.1; diverifikasi ulang
+// 2026-09-21). A₁ diintegrasikan dengan aturan persegi-kiri L-RAM memakai
+// |ω|·dt sebagai Δδ, jadi galat diskretisasi O(dt). Galat terukur vs analitik:
+// ~6% pada durasi SC 0.12 s, ~5% (0.15 s), ~4% (0.18 s), ~3% (0.25 s) — turun
+// saat area membesar. A₁_num konsisten lebih KECIL dari nilai sebenarnya
+// (underestimate), sehingga syarat A₂ ≥ A₁/EAC_TOL menjadi lebih mudah dipenuhi
+// dan verdict condong ke arah STABIL. Maksud toleransi 2% adalah menyerap
+// round-off RK4, tapi galat integrasi melampaui itu pada fault pendek; verdict
+// di sekitar ambang (A₂/A₁ ≈ 1) bisa ditentukan oleh galat numerik, bukan fisika.
+// Untuk verdict yang tegas di ambang, ganti ke aturan titik-tengah (midpoint),
+// yang galatnya O(dt²), atau bandingkan A₂ tersedia terhadap A₁ analitik.
 const EAC_TOL=1.02;
 // Snapshot evaluasi EAC (tiket 09.2). Mencegat potongan akselerasi/decelerasi
 // area pemakai SLIDER LIVE (Ef/Pm/Xs) pasca-event. Verdict harus beku pada
@@ -2802,6 +2814,10 @@ function initDragHandles(){
 let oos_active=false,oos_interval=null,oos_ctx=null;
 function getACtx(){
   if(!oos_ctx){try{oos_ctx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  // Tiket 09.11: AudioContext dibuat jauh dari gesture pengguna (saat trip) bisa
+  // lahir dalam keadaan 'suspended' di Chrome → alarm tak pernah terdengar.
+  // resume() dipanggil tiap beep; kalau sudah running, ini no-op.
+  if(oos_ctx&&oos_ctx.state==='suspended'&&oos_ctx.resume)oos_ctx.resume().catch(()=>{});
   return oos_ctx;
 }
 function playBeep(){
@@ -2926,19 +2942,22 @@ function startRLR(){
   drawRLRChart(S);
 }
 function stopRLR(){
-  // Tiket 09.7: tangkap DAYA AKTUAL saat handoff SEBELUM setMode — setelah
-  // setMode('grid') governor nonaktif sehingga getPmEff() mengembalikan s.Pm
-  // (beban profil yang lag), bukan Pm_gov (daya yang benar-benya dihasilkan).
+  // Tiket 09.7: tangkap DAYA AKTUAL saat handoff SEBELUM setMode. Setelah
+  // setMode('grid') governor nonaktif, sehingga getPmEff() mengembalikan s.Pm
+  // (beban profil yang masih tertinggal di belakang lag governor) — bukan
+  // Pm_gov, daya yang benar-benar sedang dihasilkan turbin.
   const Pm_handoff=Math.max(0,getPmEff(S));
   rlr_running=false;setMode('grid');
   // Bumpless: saat RLR berakhir, governor sudah membawa daya ke Pm_gov (~0.709),
-  // sementara beban profil s.Pm masih di 0.589 (lag). Di grid mode Pm_eff = s.Pm,
-  // jadi tanpa penyesuaian daya melompat −0.12 pu. Setpoint grid yang benar
-  // adalah daya aktual saat handoff, bukan beban profil yang belum dikejar.
-  // DISET ELAKAN drawRLRChart supaya tidak overwrite oleh reset SC / runSc.
+  // sementara beban profil s.Pm masih di 0.589. Di grid mode Pm_eff = s.Pm, jadi
+  // tanpa penyesuaian daya melompat −0.12 pu. Setpoint grid yang benar adalah
+  // daya termal terakhir (Pm_handoff), bukan beban profil yang belum dikejar.
+  // Nilai ini juga menggantikan Xg/Pm_gov agar governor "siap" bila user masuk
+  // island lagi tanpa lompatan.
   S.Pm=Pm_handoff;S.Xg=Pm_handoff;S.Pm_gov=Pm_handoff;
-  // Tiket 09.8: sinkronkan slider + number input Pm ke setpoint handoff
-  // (selama RLR kedua kontrol ini di-disable).
+  // Tiket 09.8: slider + number input Pm di-disable selama RLR dan menyimpan
+  // nilai pre-RLR; sinkronkan ke setpoint handoff supaya drag kecil tidak
+  // melompatkan daya ke nilai slider lama.
   uiSl('Pm',S.Pm);
   ['sPm','nPm','adj-pm-dn','adj-pm-up'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   document.getElementById('btn-rlr-s').style.display='block';
@@ -2947,8 +2966,6 @@ function stopRLR(){
   if(hb){hb.textContent='▶ Load Response';hb.style.borderColor='var(--green)';hb.style.color='var(--green)';}
   if(S.t>=RLR_DUR-.1)setNarr('Real Load Response SELESAI. 24 jam profil beban disimulasikan dalam 36 detik.');
   drawRLRChart(S);
-  // Sekali lagi set setpoint agar drawRLRChart/runSc tidak menimpa (defensif)
-  S.Pm=Pm_handoff;uiSl('Pm',S.Pm);
 }
 function toggleRLR(){if(rlr_running)stopRLR();else startRLR();}
 
