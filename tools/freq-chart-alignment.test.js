@@ -1,162 +1,59 @@
-#!/usr/bin/env node
 /**
- * Test: Frequency chart alignment & stability
+ * freq-chart-alignment.test.js — tiket 10
  *
- * Bug: Kurva frekuensi sisi kanan menjorok ke kiri dibanding 3 kurva lain
- *      dan berkedip saat sumbu waktu ter-refresh.
+ * Bug: plot area chart frekuensi lebih sempit ~18px dibanding 3 chart di atasnya
+ * (kurva freq menjorok ke kiri). Penyebab: chart freq satu-satunya yang menampilkan
+ * sumbu-X; tick label terakhir ("30") menyita lebar di tepi kanan plot, sementara
+ * chart 1-3 menyembunyikan sumbu-X sehingga plot-nya melebar penuh.
  *
- * Root cause:
- * 1. Chart freq punya X-axis title → plot area lebih kecil → skala horizontal berbeda
- * 2. ScaleStabilizer update dengan timing berbeda + animation → blink
+ * Tes ini mengukur chartArea Chart.js yang SEBENARNYA di browser (Puppeteer) —
+ * bukan memindai teks sumber. Perbaikan (layout.padding.right di baseOptsNoX)
+ * menyusutkan plot chart 1-3 dari kanan agar keempat plot area sama lebar.
+ *
+ * Menjalankan Chrome headless; butuh `puppeteer` (sudah devDependency).
  */
-
-const fs = require('fs');
+const puppeteer = require('puppeteer');
 const path = require('path');
 
-const HTML_PATH = path.join(__dirname, '..', 'LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html');
+const HTML = 'file://' + path.resolve(__dirname, '..', 'LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html');
 
-console.log('=== Test: Frequency Chart Alignment & Stability ===\n');
+let pass = 0, fail = 0;
+const assertTrue = (c, m) => { if (c) { pass++; console.log(`  ✓ ${m}`); } else { fail++; console.log(`  ✗ ${m}`); } };
 
-let html;
-try {
-  html = fs.readFileSync(HTML_PATH, 'utf-8');
-} catch (e) {
-  console.error('GAGAL: File HTML tidak ditemukan');
-  process.exit(1);
-}
+(async () => {
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1600, height: 1100 });
+  await page.goto(HTML, { waitUntil: 'load' });
+  // Tunggu chart terinisialisasi (kode memakai `const timeCharts` di top-level
+  // classic script — bukan properti window, jadi akses langsung identifier)
+  await page.waitForFunction(() => typeof timeCharts !== 'undefined' && timeCharts.freq && timeCharts.freq.chartArea, { timeout: 8000 });
+  // Beri satu frame agar pinSharedYWidthOnce sempat mem-pin lebar Y
+  await new Promise(r => setTimeout(r, 300));
 
-let failed = 0;
-
-// ===== TEST 1: X-axis configuration consistency =====
-console.log('TEST 1: X-axis configuration consistency');
-
-// Extract baseOptsNoX and baseOptsWithX
-const baseOptsNoXMatch = html.match(/const baseOptsNoX=\{[\s\S]*?scales:\{[\s\S]*?x:\{[\s\S]*?\},/);
-const baseOptsWithXMatch = html.match(/const baseOptsWithX=\{[\s\S]*?scales:\{[\s\S]*?x:\{[\s\S]*?\},[\s\S]*?title:\{display:true/);
-
-if (!baseOptsNoXMatch || !baseOptsWithXMatch) {
-  console.log('  ✗ GAGAL: Tidak dapat menemukan konfigurasi X-axis');
-  failed++;
-} else {
-  const noXConfig = baseOptsNoXMatch[0];
-  const withXConfig = baseOptsWithXMatch[0];
-
-  // Chart 1-3 seharusnya TIDAK punya title
-  const noXHasTitle = noXConfig.includes('title:{display:true');
-
-  // Chart 4 seharusnya PUNYA title
-  const withXHasTitle = withXConfig.includes('title:{display:true');
-
-  console.log(`  Chart 1-3 X-axis title: ${noXHasTitle ? 'ADA (BUG!)' : 'TIDAK ADA (correct)'}`);
-  console.log(`  Chart 4 X-axis title: ${withXHasTitle ? 'ADA (ini yang menyebabkan misalignment)' : 'TIDAK ADA'}`);
-
-  if (noXHasTitle) {
-    console.log('  ✗ GAGAL: Chart 1-3 seharusnya tidak punya X-axis title');
-    failed++;
-  } else if (!withXHasTitle) {
-    console.log('  ✗ GAGAL: Chart 4 seharusnya punya X-axis title');
-    failed++;
-  }
-}
-
-// ===== TEST 2: Chart layout compensation =====
-console.log('\nTEST 2: Chart layout padding compensation');
-
-// Cek apakah ada padding/layout compensation untuk menyamakan plot area
-const hasLayoutCompensation = html.includes('layout:{padding:') ||
-                              html.includes('chartArea:') ||
-                              html.includes('// Plot area compensation') ||
-                              html.includes('// X-axis title compensation');
-
-if (hasLayoutCompensation) {
-  console.log('  ✓ LOLOS: Ada mekanisme kompensasi layout untuk menyamakan plot area');
-} else {
-  console.log('  ✗ GAGAL: Tidak ada kompensasi layout');
-  console.log('    Akibat: Plot area chart freq lebih kecil → data menjorok ke kiri');
-  failed++;
-}
-
-// ===== TEST 3: Animation configuration untuk stabilitas =====
-console.log('\nTEST 3: Animation configuration untuk mencegah blink');
-
-// Extract freq chart creation
-const freqChartMatch = html.match(/timeCharts\.freq=new Chart\(canvases\[3\],\{[\s\S]*?\}\);/);
-
-if (!freqChartMatch) {
-  console.log('  ✗ GAGAL: Tidak dapat menemukan konfigurasi freq chart');
-  failed++;
-} else {
-  const freqConfig = freqChartMatch[0];
-
-  // Cek animation duration
-  const animDurationMatch = freqConfig.match(/animation:\{[\s\S]*?duration:(\d+)/);
-
-  if (!animDurationMatch) {
-    console.log('  ⚠ WARNING: Tidak dapat mengekstrak animation duration');
-  } else {
-    const duration = parseInt(animDurationMatch[1]);
-    console.log(`  Animation duration: ${duration}ms`);
-
-    if (duration > 0) {
-      console.log('  ⚠ PERHATIAN: Animation enabled - bisa menyebabkan blink');
-      console.log('    Recommendation: Set duration:0 atau false untuk chart freq');
-    } else {
-      console.log('  ✓ LOLOS: Animation disabled');
+  const areas = await page.evaluate(() => {
+    const out = {};
+    for (const k of ['delta', 'omega', 'power', 'freq']) {
+      const a = timeCharts[k].chartArea;
+      out[k] = { left: Math.round(a.left), right: Math.round(a.right), width: Math.round(a.right - a.left) };
     }
+    return out;
+  });
+
+  console.log('\n=== Tiket 10: alignment plot area chart frekuensi ===\n');
+  console.log('  plot area:', JSON.stringify(areas));
+
+  // Keempat plot area harus sama LEBAR — inilah bug tiket 10 (freq menjorok
+  // karena tick label tepi sumbu-X-nya menyita ruang kanan). Toleransi 4px
+  // untuk pembulatan pixel + beda lebar Y natural sebelum pinSharedYWidthOnce
+  // mem-pin lebar Y (baru terjadi setelah commit chart pertama).
+  const ref = areas.delta.width;
+  for (const k of ['omega', 'power', 'freq']) {
+    const d = Math.abs(areas[k].width - ref);
+    assertTrue(d <= 4, `plot area ${k} (${areas[k].width}px) ≈ delta (${ref}px), selisih ${d}px`);
   }
-}
 
-// ===== TEST 4: Update mode consistency =====
-console.log('\nTEST 4: Chart update mode consistency');
-
-// Semua chart seharusnya update dengan mode 'none' untuk performa
-const updateCalls = html.match(/timeCharts\.\w+\.update\(['"](\w+)['"]\)/g) || [];
-console.log(`  Total update calls: ${updateCalls.length}`);
-
-const nonNoneUpdates = updateCalls.filter(call => !call.includes("'none'") && !call.includes('"none"'));
-
-if (nonNoneUpdates.length > 0) {
-  console.log(`  ⚠ WARNING: ${nonNoneUpdates.length} update calls tidak menggunakan 'none' mode`);
-  console.log('    Ini bisa menyebabkan re-layout yang lambat');
-} else {
-  console.log('  ✓ LOLOS: Semua update menggunakan mode "none"');
-}
-
-// ===== TEST 5: Scale stabilizer tolerance =====
-console.log('\nTEST 5: ScaleStabilizer tolerance untuk freq chart');
-
-const stabilizerMatch = html.match(/chartStabilizers=\{[\s\S]*?freq:new ScaleStabilizer\(\{tolerance:([\d.]+)\}\)/);
-
-if (!stabilizerMatch) {
-  console.log('  ✗ GAGAL: Tidak dapat menemukan freq stabilizer configuration');
-  failed++;
-} else {
-  const tolerance = parseFloat(stabilizerMatch[1]);
-  console.log(`  Freq stabilizer tolerance: ${tolerance}`);
-
-  if (tolerance < 0.03) {
-    console.log('  ⚠ WARNING: Tolerance terlalu kecil - bisa menyebabkan blink');
-    console.log('    Recommendation: Naikkan ke >= 0.03 untuk stabilitas');
-  } else {
-    console.log('  ✓ LOLOS: Tolerance cukup untuk stabilitas');
-  }
-}
-
-// ===== SUMMARY =====
-console.log('\n' + '='.repeat(50));
-if (failed === 0) {
-  console.log('✓ SEMUA TES LOLOS');
-  process.exit(0);
-} else {
-  console.log(`✗ ${failed} TES GAGAL`);
-  console.log('\nDiagnosis:');
-  console.log('1. X-axis title di chart freq memakan space → plot area lebih kecil');
-  console.log('2. Plot area berbeda ukuran → skala horizontal berbeda → menjorok ke kiri');
-  console.log('3. Scale stabilizer + animation → blink effect');
-  console.log('\nSolusi:');
-  console.log('1. Tambah padding compensation di chart 1-3 untuk samakan plot area');
-  console.log('2. Atau: hilangkan X-axis title di chart freq');
-  console.log('3. Set animation duration ke 0 untuk chart freq');
-  console.log('4. Naikkan tolerance stabilizer freq ke >= 0.03');
-  process.exit(1);
-}
+  await browser.close();
+  console.log(`\n=== Summary ===\nPassed: ${pass}  Failed: ${fail}`);
+  process.exit(fail > 0 ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });
