@@ -29,6 +29,7 @@ Ditulis terhadap commit `ddcca16` di branch `fix/critical-governor-and-bugs`.
 | [07](07-interaction-a11y.md) | Interaksi & aksesibilitas | — | done (`62ca22d`, `e422ece`) |
 | [08](08-end-to-end-test-coverage.md) | Coverage tes fitur inti (regresi gate) | 02 | done (`15b8f04`) |
 | [09](09-audit-adversarial-fisika-2026-09-20.md) | Audit adversarial fisika (EAC live-params, RLR handoff, OOS post-trip) | — | in-progress (2026-09-21) |
+| [10](10-freq-chart-alignment-backlog.md) | Frekuensi chart: alignment sumbu & toleransi stabilizer | keputusan user | backlog |
 
 Status: `ready-for-agent` | `in-progress` | `done` | `blocked` (dengan alasan) | `rejected` (dengan alasan).
 
