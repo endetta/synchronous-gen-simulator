@@ -76,7 +76,7 @@ async function makeExtractor(htmlPath) {
     const names = ['makeState','ode','rk4','stepPhys','procEvts','runSc','startRLR','stopRLR',
       'toggleRLR','setMode','setAnimMode','doReset','trigSC','onSl','numSl','adjSl','togglePane',
       'getPe','getPmax','getQe','getS','getPF','getPFNature','getCC','getCCT','getVt',
-      'getPmEff','govActive','getA2Available','eacStable',
+      'getPmEff','govActive','getA2Available','eacStable','snapEac','freezeSliders','slidersFrozen',
       'setNarr','autoNarr','updateCards','updateHdr','getRLRLoad','getRLRPeriod'];
     const out = {};
     for (const n of names) out[n] = _get(n);

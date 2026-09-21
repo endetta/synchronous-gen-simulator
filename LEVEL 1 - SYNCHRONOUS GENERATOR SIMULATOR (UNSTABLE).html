@@ -715,8 +715,12 @@ function stepPhys(s,rdt){
   }
   // Particle system
   updateParticles(s,cap);
-  s.anim+=VSPD*rdt;
-  if(s.anim>Math.PI*2)s.anim-=Math.PI*2;
+  // Tiket 09.5: setelah trip, visual medan/rotor TIDAK terus berputar —
+  // banner KEHILANGAN SINKRONISASI menandai generator benar-benar mati.
+  if(!s.oos_tripped){
+    s.anim+=VSPD*rdt;
+    if(s.anim>Math.PI*2)s.anim-=Math.PI*2;
+  }
   // OOS check — LATCHED. Begitu generator kehilangan sinkronisme, ia TRIP:
   // fisika berhenti (lihat break di stepPhys) dan banner bertahan sampai
   // pengguna menekan DISMISS & RESET. Tidak ada auto-clear: generator yang
@@ -725,9 +729,16 @@ function stepPhys(s,rdt){
   const ddeg=s.delta*R2D;
   if(ddeg>160||ddeg<-160){
     s.oos_tripped=true;
+    // Tiket 09.3: pasca-trip, event SC sudah selesai — generator TRIP, bukan
+    // masih fault. Tanpa ini, badge SC tetap menyala dan narasi terakhir
+    // "FAULT AKTIF..." menggantung sampai reset.
+    s.sc_active=false;s.sc_on=false;
+    if(s.eac_phase==='fault')s.eac_phase='done';
+    s.evts=[]; // hentikan event scenario yang belum jalan
     document.getElementById('oos-txt').textContent='⚡ LOSS OF SYNCHRONISM — δ = '+ddeg.toFixed(1)+'° — GENERATOR TRIP';
     document.getElementById('oos-warn').classList.add('show');
     document.getElementById('oos-overlay').classList.add('show');
+    freezeSliders(true);   // tiket 09.6: kunci slider
     startOOSAlarm();
     if(rlr_running)stopRLR();
   }
@@ -2663,13 +2674,18 @@ function updTrack(el){
   const pct=((+el.value-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';
   el.style.setProperty('--pct',pct);
 }
-function onSl(key,el){S[key]=+el.value;updTrack(el);document.getElementById('n'+key).value=(+el.value).toFixed(3);}
+function onSl(key,el){
+  if(slidersFrozen()){el.value=S[key];updTrack(el);return;} // tiket 09.6: fisika beku pasca-trip
+  S[key]=+el.value;updTrack(el);document.getElementById('n'+key).value=(+el.value).toFixed(3);
+}
 function numSl(key,el){
+  if(slidersFrozen()){const cur=S[key];el.value=cur.toFixed(3);const s0=document.getElementById('s'+key);s0.value=cur;updTrack(s0);return;}
   const sl=document.getElementById('s'+key);
   const v=Math.max(+sl.min,Math.min(+sl.max,+el.value));
   S[key]=v;sl.value=v;updTrack(sl);el.value=v.toFixed(3);
 }
 function adjSl(key,dir){
+  if(slidersFrozen())return; // tiket 09.6: fisika beku pasca-trip
   const sl=document.getElementById('s'+key);
   const v=Math.max(+sl.min,Math.min(+sl.max,+sl.value+dir*.001));
   sl.value=v.toFixed(3);S[key]=v;updTrack(sl);
@@ -2681,12 +2697,28 @@ function trigSC(){
   S.sc_on=true;S.sc_t0=S.t;
   S.eac_phase='none';S.A1_num=0;S.A2_num=0;S.eac_snap=null;
 }
+// Freeze/unfreeze parameter slider pasca OOS-trip (tiket 09.6). Saat generator
+// sudah lepas sinkron dan TRIP, fisika beku — tapi readout header menghitung
+// ulang nilai live, jadi menggeser slider mengubah angka yang seolah milik
+// event lampau. Slider dikunci sampai reset.
+// Kunci di level handler (onSl/numSl/adjSl), bukan hanya `disabled` di DOM:
+// tombol adj memanggil adjSl() yang menulis S[key] langsung, jadi menyetel
+// `disabled` saja tidak cukup.
+function slidersFrozen(){ return !!(S && S.oos_tripped); }
+function freezeSliders(frozen){
+  ['sH','sD','sXs','sPm','sEf','nH','nD','nXs','nPm','nEf'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=frozen;
+  });
+  document.querySelectorAll('.sl-adj').forEach(b=>{ b.disabled=frozen; });
+}
 function doReset(full=true){
   document.getElementById('oos-warn').classList.remove('show');
   document.getElementById('oos-overlay').classList.remove('show');
   stopOOSAlarm();
   if(rlr_running)stopRLR();
   S=makeState();
+  freezeSliders(false); // tiket 09.6: lepas kunci slider dari trip sebelumnya
   document.getElementById('bGrid').classList.add('on');
   document.getElementById('bIsland').classList.remove('on');
   ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
