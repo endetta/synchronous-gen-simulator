@@ -167,6 +167,32 @@ synchronism — bug yang diperbaiki di commit `12125cc` dan dijaga oleh
    - Anderson, P. M., & Fouad, A. A. (2003). Power System Control and Stability. IEEE Press.
    - IEEE Std 399-1997, IEEE Std 421.5-2005
 
+8. **Sesi paralel = worktree terpisah (WAJIB).** Proyek ini hanya punya SATU file
+   HTML sebagai produk, jadi dua sesi yang mengedit bersamaan pasti bertabrakan.
+   Audit 2026-09-20 menemukan tiga sesi paralel mengedit file yang sama dalam satu
+   working tree; diff harus diselamatkan manual (`.scratch/stage-mine.sh`). Aturan:
+   - Maksimum **satu** sesi memegang working tree utama pada satu waktu.
+   - Bila butuh paralel: buat worktree (`git worktree add ../sgen-<topik> -b <cabang>`),
+     kerjakan di sana, merge setelah selesai. Jangan saling menimpa di tree utama.
+   - Sebelum mulai: cek `git worktree list` + `git status` untuk tahu sesi lain.
+
+9. **Push sebelum ganti sesi (WAJIB).** Jangan menunda push dengan alasan "menunggu
+   sesi paralel selesai" — audit menemukan cabang `fix/critical-governor-and-bugs`
+   tertinggal 33 commit dari `master` dan 3 commit belum di-push. Setiap akhir tugas
+   non-sepele: `git push` cabang aktif. Bila `master` tertinggal jauh, buka PR/merge
+   agar cabang kanonik memuat fix fisika yang CLAUDE.md sitasi.
+
+10. **Checkpoint untuk tugas panjang.** Jangan berjalan otonom > ±30–60 tool call
+    tanpa laporan. Di setiap checkpoint sebutkan: file yang berubah, hasil tes,
+    risiko terbuka. Setelah perbaikan UI, smoke-test panel tetangga (Panel I/II/III)
+    sebelum lanjut — beberapa regresi pada 2026-09-19/20 baru ketahuan setelah
+    panel lain rusak.
+
+11. **Gunakan tool khusus, bukan Bash, untuk inspeksi.** Pakai Read/Grep/Glob untuk
+    membaca & mencari; Bash untuk menjalankan tes/git. Hindari menulis path Windows
+    ber-apostrof ke dalam string shell (memicu `InputValidationError`); andalkan
+    working directory sesi, jangan mengulang `cd` yang sama.
+
 ## Fitur Saat Ini
 
 1. **Visualisasi:**

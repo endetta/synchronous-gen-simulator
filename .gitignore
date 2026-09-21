@@ -44,3 +44,10 @@ coverage/
 .claude/
 
 .playwright-mcp/
+
+# Agent scratchpad — probe, dump, diff sementara.
+# Catatan: tiket proyek di .scratch/sync-gen-fixes/ dikecualikan agar tetap terlacak.
+.scratch/
+!.scratch/sync-gen-fixes/
+!.scratch/sync-gen-fixes/**
+.superpowers/
