@@ -46,6 +46,13 @@ const assertClose = (a, e, tol, m) => {
   console.log(`  t=${s.t.toFixed(2)}s | Pm_gov(gov aktif)=${s.Pm_gov.toFixed(4)} | s.Pm=${s.Pm.toFixed(4)}`);
   console.log(`  getPmEff pre-stopRLR = ${effPre.toFixed(4)}`);
 
+  // Stub DOM per-id: elemen slider/number Pm perlu dibaca setelah stopRLR
+  // untuk verifikasi sinkronisasi UI (tiket 09.8). extract.js default
+  // mengembalikan satu elemen sama untuk semua id, jadi kita pasang map.
+  const { mkEl } = require('./extract');
+  const els = {};
+  global.document.getElementById = (id) => (els[id] ||= mkEl());
+
   stopRLR();
   const effPost = getPmEff(s);
   console.log(`  getPmEff post-stopRLR = ${effPost.toFixed(4)} (mode=${s.mode}, s.Pm=${s.Pm.toFixed(4)})`);
@@ -66,16 +73,13 @@ const assertClose = (a, e, tol, m) => {
 
   // --- 09.8: slider sinkron ---
   console.log('\n=== Tiket 09.8: slider Pm tersinkron pasca stopRLR ===\n');
-  // Slider DOM tidak bisa dibaca via stub extract.js; verifikasi lewat kontrak
-  // kode: stopRLR harus memanggil uiSl('Pm', ...) untuk sinkronisasi slider.
-  const fs = require('fs');
-  const src = fs.readFileSync(HTML, 'utf8');
-  const stopRLRSrc = src.match(/function stopRLR\(\)\{[\s\S]*?\nfunction toggleRLR/);
-  assertTrue(
-    !!stopRLRSrc && /uiSl\('Pm'/.test(stopRLRSrc[0]),
-    "stopRLR memanggil uiSl('Pm', ...) untuk sinkron slider"
-  );
-  assertTrue(s.Pm > 0, `s.Pm adalah daya aktual handoff (${s.Pm.toFixed(4)}), bukan nol`);
+  // Uji PERILAKU: stopRLR harus menulis setpoint handoff ke elemen slider Pm
+  // (sPm) dan number input (nPm), supaya drag kecil tidak melompat ke nilai
+  // pre-RLR. nPm memformat ke 3 desimal (toFixed), jadi toleransi 0.001.
+  assertTrue(els.sPm && Math.abs(parseFloat(els.sPm.value) - s.Pm) < 1e-6,
+    `slider sPm.value = setpoint handoff (${els.sPm?.value} vs ${s.Pm.toFixed(4)})`);
+  assertTrue(els.nPm && Math.abs(parseFloat(els.nPm.value) - s.Pm) < 0.001,
+    `number nPm.value ≈ setpoint handoff (${els.nPm?.value} vs ${s.Pm.toFixed(4)})`);
 
   // --- 09.9: klik Grid saat RLR jalan ---
   console.log('\n=== Tiket 09.9: klik Grid saat RLR aktif ===\n');

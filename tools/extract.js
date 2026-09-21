@@ -102,7 +102,8 @@ async function makeExtractor(htmlPath) {
   // pesannya menjelaskan apa yang hilang dan apa yang harus dilakukan.
   const REQUIRED = [
     'makeState', 'getPmax', 'getPe', 'getQe', 'getS', 'getPF', 'getCC', 'getCCT',
-    'getPmEff', 'govActive', 'getA2Available', 'eacStable',
+    'getPmEff', 'govActive', 'getA2Available', 'eacStable', 'snapEac',
+    'freezeSliders', 'slidersFrozen', 'setNarr', 'updateCards', 'updateHdr',
     'ode', 'rk4', 'stepPhys', 'doReset', 'trigSC', 'setMode', 'runSc',
     'getRLRLoad',
   ];

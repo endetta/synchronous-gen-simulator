@@ -747,6 +747,10 @@ function stepPhys(s,rdt){
     s.sc_active=false;s.sc_on=false;
     if(s.eac_phase==='fault')s.eac_phase='done';
     s.evts=[]; // hentikan event scenario yang belum jalan
+    // autoNarr() berhenti dijalankan setelah trip (blok HSTEP terakhir saat
+    // fisika beku), jadi pesan fase fault akan menggantung sebagai narasi
+    // terakhir. Tulis pesan TRIP di sini supaya teks terakhir benar.
+    if(!s._scnarr)setNarr('KEHILANGAN SINKRONISASI. δ='+ddeg.toFixed(1)+'° — GENERATOR TRIP. Tekan DISMISS & RESET.');
     document.getElementById('oos-txt').textContent='⚡ LOSS OF SYNCHRONISM — δ = '+ddeg.toFixed(1)+'° — GENERATOR TRIP';
     document.getElementById('oos-warn').classList.add('show');
     document.getElementById('oos-overlay').classList.add('show');
@@ -2713,13 +2717,18 @@ function trigSC(){
   S.sc_on=true;S.sc_t0=S.t;
   S.eac_phase='none';S.A1_num=0;S.A2_num=0;S.eac_snap=null;
 }
-// Freeze/unfreeze parameter slider pasca OOS-trip (tiket 09.6). Saat generator
-// sudah lepas sinkron dan TRIP, fisika beku — tapi readout header menghitung
-// ulang nilai live, jadi menggeser slider mengubah angka yang seolah milik
-// event lampau. Slider dikunci sampai reset.
-// Kunci di level handler (onSl/numSl/adjSl), bukan hanya `disabled` di DOM:
-// tombol adj memanggil adjSl() yang menulis S[key] langsung, jadi menyetel
-// `disabled` saja tidak cukup.
+// Freeze parameter slider pasca OOS-trip (tiket 09.6). Saat generator sudah
+// lepas sinkron dan TRIP, fisika beku — tapi readout header menghitung ulang
+// nilai live, jadi menggeser slider mengubah angka yang seolah milik event
+// lampau. Slider dikunci sampai reset.
+//
+// Kunci di level handler (onSl/numSl/adjSl) sebagai pertahanan utama, PLUS
+// `disabled` di DOM sebagai umpan balik visual. Keduanya diperlukan: tombol adj
+// memanggil adjSl() yang menulis S[key] langsung (jadi `disabled` saja tidak
+// cukup), sedangkan skenario (procEvts) dan uiSl menulis state/DOM tanpa
+// melewati handler (jadi guard handler saja tidak menutup semuanya).
+// Jalur skenario aman karena stepPhys break di awal substep saat oos_tripped
+// dan trip mengosongkan s.evts — invarian itu dijaga di sana, bukan di sini.
 function slidersFrozen(){ return !!(S && S.oos_tripped); }
 function freezeSliders(frozen){
   ['sH','sD','sXs','sPm','sEf','nH','nD','nXs','nPm','nEf'].forEach(id=>{
@@ -2959,7 +2968,13 @@ function stopRLR(){
   // nilai pre-RLR; sinkronkan ke setpoint handoff supaya drag kecil tidak
   // melompatkan daya ke nilai slider lama.
   uiSl('Pm',S.Pm);
-  ['sPm','nPm','adj-pm-dn','adj-pm-up'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
+  // Re-enable kontrol Pm hanya bila generator TIDAK sedang trip. Kalau trip
+  // terjadi di tengah RLR, stepPhys memanggil freezeSliders(true) lalu
+  // stopRLR(); tanpa cek ini, kontrol Pm akan menyala kembali dan DOM
+  // bertentangan dengan freeze.
+  if(!S.oos_tripped){
+    ['sPm','nPm','adj-pm-dn','adj-pm-up'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
+  }
   document.getElementById('btn-rlr-s').style.display='block';
   document.getElementById('btn-rlr-x').style.display='none';
   const hb=document.getElementById('hbtn-rlr');

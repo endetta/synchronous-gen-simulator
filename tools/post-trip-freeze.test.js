@@ -47,6 +47,17 @@ const assertTrue = (c, m) => {
     `omega tidak bertambah pasca-trip (tetap ${omegaTrip.toExponential(3)})`
   );
 
+  // 9.3: narasi terakhir harus mengabarkan TRIP, bukan pesan fase fault yang basi.
+  // autoNarr() hanya berjalan di dalam blok HSTEP stepPhys, yang berhenti setelah
+  // trip — jadi tanpa penulisan narasi di jalur trip, teks terakhir tetap
+  // "FAULT AKTIF. ..." milik event yang sudah selesai.
+  assertTrue(/trip/i.test(s.narr), `narasi pasca-trip menyebut TRIP (narr="${s.narr}")`);
+  assertTrue(!/fault aktif/i.test(s.narr), `narasi bukan lagi pesan fase fault (narr="${s.narr}")`);
+  // Badge SC harus padam: sc_active false agar updateHdr mencabut kelas 'on'
+  assertTrue(s.sc_active === false, 'sc_active false pasca-trip (badge SC padam)');
+  assertTrue(s.eac_phase === 'done' || s.eac_phase === 'post', `eac_phase bukan 'fault' lagi (got ${s.eac_phase})`);
+  assertTrue(s.evts.length === 0, 'evts scenario dikosongkan saat trip (tidak ada event lanjutan)');
+
   // 9.5: anim harus berhenti bertambah
   const animAfter = s.anim;
   assertTrue(
@@ -54,26 +65,34 @@ const assertTrue = (c, m) => {
     `s.anim tidak bertambah pasca-trip (before=${animTrip.toFixed(4)}, after=${animAfter.toFixed(4)})`
   );
 
-  // 9.6: slider harus nonaktif pasca-trip. Stub DOM mengembalikan elemen yang sama
-  // untuk semua id, jadi cek lewat efek: state tidak boleh berubah walau
-  // handler slider dipanggil. Verifikasi langsung via helper freezeSliders bila ada.
-  const hasFreeze = typeof M.freezeSliders === 'function';
-  console.log(`  helper freezeSliders ada: ${hasFreeze}`);
-  assertTrue(hasFreeze, 'freezeSliders() tersedia (kontrak freeze slider post-trip)');
-  if (hasFreeze) {
-    M.freezeSliders(true);
-    // Setelah freeze, onSl seharusnya no-op atau diblokir; cek elemen disabled
-    assertTrue(true, 'freezeSliders(true) dapat dipanggil tanpa error');
-  }
+  // 9.6: guard slider. Uji PERILAKU: pasca-trip, handler slider tidak boleh
+  // memutasi state fisika; sebelum trip, harus memutasi. Ini butuh stub DOM
+  // yang mengembalikan elemen berbeda per-id (extract.js default mengembalikan
+  // satu elemen yang sama untuk semua id).
+  const { mkEl } = require('./extract');
+  const els = {};
+  const elFor = (id) => (els[id] ||= mkEl());
+  global.document.getElementById = (id) => elFor(id);
 
-  // Reset melepas latch & unfreeze
+  // Pasca-trip: onSl('Ef', {value:'2.500'}) harus DITOLAK — S.Ef tidak berubah
+  const fakeEl = (v) => ({ value: v, min: '0.1', max: '3', style: { setProperty() {} } });
+  const efBefore = s.Ef;
+  M.onSl('Ef', fakeEl('2.500'));
+  assertTrue(s.Ef === efBefore, `onSl ditolak pasca-trip (S.Ef tetap ${efBefore})`);
+  // adjSl juga menulis S[key] langsung — harus ditolak
+  const efBefore2 = s.Ef;
+  M.adjSl('Ef', 1);
+  assertTrue(s.Ef === efBefore2, `adjSl ditolak pasca-trip (S.Ef tetap ${efBefore2})`);
+
+  // Reset melepas latch & unfreeze, lalu handler harus bekerja lagi
   M.doReset(false);
   const s2 = M.getS_();
   assertTrue(!s2.oos_tripped, 'doReset melepas latch oos_tripped');
-  if (hasFreeze) {
-    M.freezeSliders(false);
-    assertTrue(true, 'freezeSliders(false) dapat dipanggil tanpa error');
-  }
+
+  // Sebelum trip (state baru): onSl harus MENGUBAH S.Ef
+  const efFresh = s2.Ef;
+  M.onSl('Ef', fakeEl('2.500'));
+  assertTrue(s2.Ef === 2.5, `onSl bekerja normal saat tidak trip (S.Ef ${efFresh} → ${s2.Ef})`);
 
   console.log(`\n=== Summary ===\nPassed: ${passCount}  Failed: ${failCount}`);
   process.exit(failCount > 0 ? 1 : 0);
