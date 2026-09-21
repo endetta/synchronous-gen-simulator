@@ -2642,6 +2642,10 @@ function setMode(m){
   if(m==='island'&&S.mode!=='island'&&!rlr_running){
     S.Xg=Math.max(0,S.Pm);S.Pm_gov=Math.max(0,S.Pm);
   }
+  // Tiket 09.9: RLR hanya bermakna di island mode (profil beban di-drive oleh
+  // governor). Klik "Grid" saat RLR jalan membuat f display "50.00 Hz" padahal
+  // omega masih dihitung island — hentikan RLR agar mode UI == fisika.
+  if(m==='grid'&&rlr_running)stopRLR();
   S.mode=m;
   document.getElementById('bGrid').classList.toggle('on',m==='grid');
   document.getElementById('bIsland').classList.toggle('on',m==='island');
@@ -2922,7 +2926,20 @@ function startRLR(){
   drawRLRChart(S);
 }
 function stopRLR(){
+  // Tiket 09.7: tangkap DAYA AKTUAL saat handoff SEBELUM setMode — setelah
+  // setMode('grid') governor nonaktif sehingga getPmEff() mengembalikan s.Pm
+  // (beban profil yang lag), bukan Pm_gov (daya yang benar-benya dihasilkan).
+  const Pm_handoff=Math.max(0,getPmEff(S));
   rlr_running=false;setMode('grid');
+  // Bumpless: saat RLR berakhir, governor sudah membawa daya ke Pm_gov (~0.709),
+  // sementara beban profil s.Pm masih di 0.589 (lag). Di grid mode Pm_eff = s.Pm,
+  // jadi tanpa penyesuaian daya melompat −0.12 pu. Setpoint grid yang benar
+  // adalah daya aktual saat handoff, bukan beban profil yang belum dikejar.
+  // DISET ELAKAN drawRLRChart supaya tidak overwrite oleh reset SC / runSc.
+  S.Pm=Pm_handoff;S.Xg=Pm_handoff;S.Pm_gov=Pm_handoff;
+  // Tiket 09.8: sinkronkan slider + number input Pm ke setpoint handoff
+  // (selama RLR kedua kontrol ini di-disable).
+  uiSl('Pm',S.Pm);
   ['sPm','nPm','adj-pm-dn','adj-pm-up'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   document.getElementById('btn-rlr-s').style.display='block';
   document.getElementById('btn-rlr-x').style.display='none';
@@ -2930,6 +2947,8 @@ function stopRLR(){
   if(hb){hb.textContent='▶ Load Response';hb.style.borderColor='var(--green)';hb.style.color='var(--green)';}
   if(S.t>=RLR_DUR-.1)setNarr('Real Load Response SELESAI. 24 jam profil beban disimulasikan dalam 36 detik.');
   drawRLRChart(S);
+  // Sekali lagi set setpoint agar drawRLRChart/runSc tidak menimpa (defensif)
+  S.Pm=Pm_handoff;uiSl('Pm',S.Pm);
 }
 function toggleRLR(){if(rlr_running)stopRLR();else startRLR();}
 
