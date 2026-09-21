@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately) — kecuali butir 1 yang **butuh persetujuan eksplisit** karena menyentuh file di luar repo ini.
 
-**Status:** ready-for-agent
+**Status:** done — commit `e254113`; copy HTML root dihapus setelah backup terverifikasi sha256, PNG dihapus, `plans/README.md` direkonsiliasi. Bukti: `design-plans/sesi-2026-09-20-07-cleanup-artefak.md`. Ditutup 2026-09-21.
 
 ## Latar (bukti terverifikasi)
 

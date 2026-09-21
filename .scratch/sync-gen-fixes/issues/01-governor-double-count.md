@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done — commit `12125cc` (fix governor double-count `Pm` di island/RLR), dijaga `tools/governor-steady-state.test.js`. Ditutup 2026-09-21.
 
 ## Latar (bukti terverifikasi)
 

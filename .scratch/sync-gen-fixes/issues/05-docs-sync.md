@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (PRD §2.3 harus mendokumentasikan governor yang **sudah diperbaiki**, bukan yang rusak).
 
-**Status:** ready-for-agent
+**Status:** done — commit `e54dfe8` + `a608da2` (sinkronkan PRD/CLAUDE/README/overview dengan realitas kode), `92c8244` (hapus Known Issue stale). Ditutup 2026-09-21.
 
 ## Latar — drift terverifikasi
 

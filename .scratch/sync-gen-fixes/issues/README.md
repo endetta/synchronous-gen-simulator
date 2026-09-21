@@ -20,15 +20,15 @@ Ditulis terhadap commit `ddcca16` di branch `fix/critical-governor-and-bugs`.
 
 | Tiket | Judul | Blocked by | Status |
 |-------|-------|------------|--------|
-| [01](01-governor-double-count.md) | Perbaiki double-count daya mekanik governor + bumpless transfer | — | ready-for-agent |
-| [02](02-test-seam-extract-physics.md) | Seam pengujian: ekspor model fisika murni dari HTML | 01 | ready-for-agent |
-| [03](03-eac-verdict-correctness.md) | Verdict EAC sesuai buku: A₁ ≤ A₂ tersedia | 01 | ready-for-agent |
-| [04](04-oos-real-trip.md) | Loss of synchronism benar-benar trip | 01 | ready-for-agent |
-| [05](05-docs-sync.md) | Sinkronisasi dokumentasi ke realitas | 01 | ready-for-agent |
-| [06](06-cleanup-stale-artifacts.md) | Bersihkan artefak stale | — (butir-1 perlu konfirmasi) | ready-for-agent |
-| [07](07-interaction-a11y.md) | Interaksi & aksesibilitas | — | ready-for-agent |
-| [08](08-end-to-end-test-coverage.md) | Coverage tes fitur inti (regresi gate) | 02 | ready-for-agent |
-| [09](09-audit-adversarial-fisika-2026-09-20.md) | Audit adversarial fisika (EAC live-params, RLR handoff, OOS post-trip) | — | findings-only |
+| [01](01-governor-double-count.md) | Perbaiki double-count daya mekanik governor + bumpless transfer | — | done (`12125cc`) |
+| [02](02-test-seam-extract-physics.md) | Seam pengujian: ekspor model fisika murni dari HTML | 01 | done (`2b1644c`) |
+| [03](03-eac-verdict-correctness.md) | Verdict EAC sesuai buku: A₁ ≤ A₂ tersedia | 01 | done (`4d0c769`) |
+| [04](04-oos-real-trip.md) | Loss of synchronism benar-benar trip | 01 | done (`9cf279f`) |
+| [05](05-docs-sync.md) | Sinkronisasi dokumentasi ke realitas | 01 | done (`e54dfe8`, `a608da2`, `92c8244`) |
+| [06](06-cleanup-stale-artifacts.md) | Bersihkan artefak stale | — | done (`e254113`) |
+| [07](07-interaction-a11y.md) | Interaksi & aksesibilitas | — | done (`62ca22d`, `e422ece`) |
+| [08](08-end-to-end-test-coverage.md) | Coverage tes fitur inti (regresi gate) | 02 | done (`15b8f04`) |
+| [09](09-audit-adversarial-fisika-2026-09-20.md) | Audit adversarial fisika (EAC live-params, RLR handoff, OOS post-trip) | — | in-progress (2026-09-21) |
 
 Status: `ready-for-agent` | `in-progress` | `done` | `blocked` (dengan alasan) | `rejected` (dengan alasan).
 

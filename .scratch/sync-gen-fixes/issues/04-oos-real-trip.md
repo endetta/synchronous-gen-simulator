@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (setelah governor stabil, satu-satunya jalur ke OOS adalah SC yang benar-benar gagal — deteksi trip bisa diuji deterministik).
 
-**Status:** ready-for-agent
+**Status:** done — commit `9cf279f` (latch `oos_tripped` + fisika berhenti saat trip), dijaga `tools/oos-trip.test.js`. Ditutup 2026-09-21. **Sisa:** badge/narasi pasca-trip, readout beku → tiket 09 butir 9.3/9.5/9.6.
 
 ## Latar (bukti terverifikasi)
 

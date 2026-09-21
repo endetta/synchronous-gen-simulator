@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (governor harus stabil dulu supaya transient simulasi dapat dipercaya). *Berjalan paralel dengan 02* — tidak perlu menunggu seam, hanya butuh angka yang benar.
 
-**Status:** ready-for-agent
+**Status:** done — commit `4d0c769` (verdict pakai A₂ *tersedia* `getA2Available()`, bukan akumulasi + faktor 0.8), dijaga `tools/eac-verdict.test.js`. Ditutup 2026-09-21. **Sisa:** akurasi toleransi `EAC_TOL` → tiket 09 butir 9.1.
 
 ## Latar (bukti terverifikasi)
 

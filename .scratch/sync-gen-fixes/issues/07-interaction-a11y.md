@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately) — UI polish, tidak menyentuh fisika.
 
-**Status:** ready-for-agent
+**Status:** done — commit `62ca22d` (tes a11y) + `e422ece` (tooltip keyboard/sentuh, ARIA kontrol, narasi anti-kedip). Ditutup 2026-09-21.
 
 ## Latar (bukti statis)
 

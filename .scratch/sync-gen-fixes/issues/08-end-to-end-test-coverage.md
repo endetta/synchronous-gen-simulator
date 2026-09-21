@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (seam ekstraksi fisika — tes harus menggunakan kode asli dari HTML, bukan kopia). Berjalan paralel dengan 03 & 04.
 
-**Status:** ready-for-agent
+**Status:** done — commit `15b8f04` (regresi gate fitur inti: governor, SC, RLR, reset). Ditutup 2026-09-21.
 
 ## Latar
 

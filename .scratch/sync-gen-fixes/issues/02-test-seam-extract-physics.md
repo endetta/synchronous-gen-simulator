@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (perbaikan governor dulu, supaya seam yang lahir mengetes kode yang benar).
 
-**Status:** ready-for-agent
+**Status:** done — commit `2b1644c` (migrasi `model.test.js` ke ekstraksi fisika dari HTML via `tools/extract.js`; konstanta `REQUIRED` membuat fisika yang hilang = `SEAM GAGAL`). Ditutup 2026-09-21.
 
 ## Latar
 
