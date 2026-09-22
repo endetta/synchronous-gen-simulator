@@ -497,6 +497,24 @@ function showFatalError(message){
 // ================================================================
 let S=null, lastRAF=null;
 
+// ================================================================
+// SATURASI MEDAN — OCC (Open-Circuit Characteristic)
+// Arus medan I_f adalah masukan eksitasi; E_af = OCC(I_f) adalah tegangan
+// internal hasil saturasi. Kurva monoton, cekung, dan dibatasi asimtot
+// OCC_PEAK = 1.55 pu. Skala dinormalisasi supaya I_f = 1.0 pu → E_af = 1.0 pu.
+// Ref: Kundur (1994) §3.2 (OCC & knee saturasi); riset MIT OCW 6.685.
+// ================================================================
+const OCC_KNEE = 1, OCC_PEAK = 1.55;
+// Skala argumen tanh dipilih agar kurva melewati titik rated (1.0, 1.0) dan
+// mendekati asimtot OCC_PEAK: tanh(1 / OCC_ALPHA) = 1 / OCC_PEAK.
+const OCC_ALPHA = 1 / Math.atanh(1 / OCC_PEAK);
+function satCurve(If){
+  const x = Math.max(0, If) / OCC_KNEE;
+  return OCC_PEAK * Math.tanh(x / OCC_ALPHA);
+}
+function getEaf(If){ return satCurve(If); }
+function getFluxDensity(If){ return satCurve(If) / OCC_PEAK; }
+
 function makeState(){
   const H  = parseValidNumber(document.getElementById('sH').value, 8.0, 1, 15, 'Inertia H');
   const D  = parseValidNumber(document.getElementById('sD').value, 4.0, 0, 15, 'Damping D');
