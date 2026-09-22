@@ -603,17 +603,62 @@ function solveCCT(dcc, Pm, Pmax, Xd, Xq, V, H){
   return Math.sqrt(Math.max(0, 4 * H * accelerating / (2 * Math.PI * 50 * Pm)));
 }
 
+// ================================================================
+// JEMBATAN STATE ↔ PERSAMAAN SALIENT
+// Arus medan I_f adalah masukan; E_af = OCC(I_f) adalah tegangan internal
+// turunan. Pemanggil lama yang mengisi `Ef` langsung (mis. getPmax({Ef,V,Xs}))
+// tetap bermakna sama — saturasi hanya berlaku saat pemanggil memakai If.
+// ================================================================
+function setIf(s, If){
+  s.If = Math.max(0.2, Math.min(3, If));
+  s.Ef = getEaf(s.If);
+}
+function getMachineXq(s){ return getXq(s.Xs, s.poleCount || 2); }
+function getPmaxSal(s){ return s.Ef * getVt(s) / Math.max(s.Xs, 0.01); }
+function getPeState(s){ return getPeSal(s.delta, getPmaxSal(s), s.Xs, getMachineXq(s), getVt(s)); }
+// Q = Vt(E_af·cos δ − Vt)/Xd + Vt²·sin²δ·(1/Xd − 1/Xq).
+// Suku kedua lenyap saat Xq = Xd, sehingga round rotor identik dengan getQe().
+function getQeSal(s){
+  const Vt = getVt(s), Xd = Math.max(s.Xs, 0.01), Xq = Math.max(getMachineXq(s), 0.01);
+  const sd = Math.sin(s.delta);
+  return Vt * (s.Ef * Math.cos(s.delta) - Vt) / Xd + Vt * Vt * sd * sd * (1 / Xd - 1 / Xq);
+}
+
+// ================================================================
+// SOLUSI MEDAN — koefisien untuk visualisasi FEM medium.
+// brRot = komponen medan rotor dari OCC; armD/armQ = reaksi armature
+// ter-normalisasi pada sumbu-d/q. Solver ini pure dan tidak mengubah state.
+// Ref: Kundur (1994) §3.4 (armature reaction); MIT OCW 6.685.
+// ================================================================
+const ARM_COUPLE = 0.18;
+function solveField(If, Id, Iq, poleCount, delta){
+  return {
+    brRot: getFluxDensity(If),
+    armD: -Id * ARM_COUPLE,
+    armQ: Iq * ARM_COUPLE,
+    pairs: polePairs(poleCount),
+    delta
+  };
+}
+
 function makeState(){
   const H  = parseValidNumber(document.getElementById('sH').value, 8.0, 1, 15, 'Inertia H');
   const D  = parseValidNumber(document.getElementById('sD').value, 4.0, 0, 15, 'Damping D');
   const Xs = parseValidNumber(document.getElementById('sXs').value, 1.2, 0.05, 3, 'Reactance Xs');
-  const Ef = parseValidNumber(document.getElementById('sEf').value, 1.5, 0.1, 3, 'Excitation Ef');
+  // Kontrol eksitasi bermakna ARUS MEDAN I_f (spec FEM medium); tegangan
+  // internal E_af diturunkan lewat kurva OCC, jadi saturasi tidak bisa dilangkahi
+  // dari UI. Label kontrol masih "Ef" sampai plan visualisasi menggantinya.
+  // Nilai awal kontrak FEM: I_f = 1.0 pu → E_af = 1.0 pu. Kontrol lama
+  // tetap dibaca oleh UI sampai Task 5 menggantinya dengan kontrol I_f.
+  const If = 1.0;
+  const Ef = getEaf(If);
   const Pm = parseValidNumber(document.getElementById('sPm').value, 0.8, 0.01, 3, 'Mechanical Power Pm');
   const V=1.0, Pmax=Ef*V/Xs;
   const d0=Math.asin(Math.min(Math.max(Pm/Pmax,-0.9999),0.9999));
   return{
     delta:d0, omega:0, Xg:0, Pm_gov:0, t:0,
     H,D,Xs,Ef,V,Pm, mode:'grid',
+    poleCount:2, If,
     sc_active:false, sc_on:false,
     sc_delay:0.3, sc_dur:0.20, sc_t0:0, sc_Pfact:0.04,
     oos_tripped:false,
@@ -642,13 +687,16 @@ function getPmax(s){
   const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
   return s.Ef*getVt(s)/Xs_safe;
 }
-function getPe(s)  { return getPmax(s)*Math.sin(s.delta); }
-// Daya reaktif di sisi terima (Kundur 1994 §11.1):
-//   Q = Vt·(E'·cos δ − Vt) / X'd
-// Tanda: Q>0 lagging (overexcited), Q<0 leading (underexcited), Q=0 unity pf.
-function getQe(s)  {
-  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
-  const Vt=getVt(s);
+function getPe(s){
+  // Objek state dari makeState memakai persamaan salient; objek eksplisit lama
+  // tanpa poleCount tetap memakai rumus round-rotor yang sudah teruji.
+  return Object.prototype.hasOwnProperty.call(s,'poleCount') ? getPeState(s) : getPmax(s)*Math.sin(s.delta);
+}
+// Daya reaktif di sisi terima. Untuk state FEM, getQeSal menambahkan suku
+// saliency; objek eksplisit lama tanpa poleCount mempertahankan kontrak lama.
+function getQe(s){
+  if(Object.prototype.hasOwnProperty.call(s,'poleCount')) return getQeSal(s);
+  const Xs_safe=Math.max(s.Xs,0.01), Vt=getVt(s);
   return Vt*(s.Ef*Math.cos(s.delta)-Vt)/Xs_safe;
 }
 // Daya semu & faktor daya di sisi terminal.
@@ -698,9 +746,15 @@ const EAC_TOL=1.02;
 // parameter SAAT CLEAR — kalau tidak, kartu dan narasi berubah-ubah mood.
 function snapEac(s){
   return {
-    Pmax: s.Ef * s.V / Math.max(s.Xs, 0.01),
+    Pmax: getPmaxSal(s),
     Pm: getPmEff(s),
     dc: s.delta_cleared,
+    // Saliency ikut dibekukan: Xq dan jumlah kutub menentukan δ_cr / A₂ tersedia,
+    // jadi menggeser pole count pasca-event juga tidak boleh mengubah verdict.
+    Xd: s.Xs,
+    Xq: getMachineXq(s),
+    V: getVt(s),
+    H: s.H,
   };
 }
 function getA2Available(s){
@@ -709,35 +763,33 @@ function getA2Available(s){
   // konsisten untuk event itu. Saat masih fault, pakai nilai live.
   const snap = (s.eac_phase==='post'||s.eac_phase==='done') && s.eac_snap ? s.eac_snap : snapEac(s);
   const Pmax = snap.Pmax, Pm = snap.Pm, dc = snap.dc;
-  const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
-  const dcr=Math.PI-d0;
-  if(dc>=dcr) return 0;                 // clearing sudah lewat δ_cr → tidak ada area tersisa
-  return Pmax*(Math.cos(dc)-Math.cos(dcr))-Pm*(dcr-dc);
+  const Xd = Math.max(snap.Xd, 0.01), Xq = Math.max(snap.Xq, 0.01), V = snap.V;
+  const dcr = solveDeltaCr(Pm, Pmax, Xd, Xq, V);
+  if(dcr === null || dc >= dcr) return 0;   // clearing lewat δ_cr → tidak ada area tersisa
+  // A₂ tersedia = integral (Pe(δ) − Pm) dari δ_clear sampai δ_cr.
+  return area(dc, dcr, (d) => Math.max(0, getPeSal(d, Pmax, Xd, Xq, V) - Pm));
 }
 function eacStable(s){ return getA2Available(s)>=s.A1_num/EAC_TOL; }
 
-function getCC(s){  // Critical clearing angle formula (Kundur eq.11.13)
-  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
-  const Pmax=s.Ef*s.V/Xs_safe;
+function getCC(s){  // Critical clearing angle (Kundur eq.11.13 umum untuk mesin salient)
+  const Pmax=getPmaxSal(s);
   const Pm=getPmEff(s);
-  const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
-  const c=Pm*(Math.PI-2*d0)/Pmax-Math.cos(d0);
-  if(c<-1||c>1) return null;
-  return Math.acos(c);
+  return solveDeltaCc(Pm, Pmax, Math.max(s.Xs,0.01), getMachineXq(s), getVt(s));
 }
 function getCCT(s){ // Critical clearing time (Kundur eq.11.17; Pe_fault≈0)
-  const dcc=getCC(s); if(!dcc) return null;
-  const Xs_safe=Math.max(s.Xs,0.01); // Division by zero guard
-  const Pmax=s.Ef*s.V/Xs_safe;
   const Pm=getPmEff(s);
-  const d0=Math.asin(Math.min(Pm/Pmax,0.9999));
   if(Pm<=0) return null;
-  return Math.sqrt(4*s.H*(dcc-d0)/(WS*Pm));
+  const Pmax=getPmaxSal(s);
+  const Xd=Math.max(s.Xs,0.01), Xq=getMachineXq(s), V=getVt(s);
+  const dcc=solveDeltaCc(Pm, Pmax, Xd, Xq, V);
+  if(dcc===null) return null;
+  return solveCCT(dcc, Pm, Pmax, Xd, Xq, V, s.H);
 }
 
 function ode(s, delta, omega, Xg, Pm_gov){
-  const Pmax=getPmax(s);
-  const Pe=Pmax*Math.sin(delta);
+  // Pe memakai persamaan salient penuh; saat Xq = Xd (2 kutub) suku reluctance
+  // lenyap sehingga hasil round-rotor lama tetap berlaku persis.
+  const Pe=getPeSal(delta, getPmaxSal(s), s.Xs, getMachineXq(s), getVt(s));
   // Saat governor aktif, Pm_gov adalah daya mekanik efektif (bukan tambahan atas s.Pm).
   const gov=govActive(s);
   const Pm_eff=Math.min(Math.max(gov?Pm_gov:s.Pm,0),3.5);
@@ -794,16 +846,15 @@ function stepPhys(s,rdt){
     // PERTAMA (omega melewati nol). Setelah puncak, A2 berhenti — kriteria buku
     // teks membandingkan A2 tersedia pada swing pertama, bukan akumulasi tak terbatas.
     // (Kundur 1994 §11.2; Anderson & Fouad 2003 §2.4)
-    const Pmax_b=s.Ef*s.V/s.Xs;
     const Pm_eff=getPmEff(s);
     if(s.eac_phase==='fault'){
-      const Pe_f=getPmax(s)*Math.sin(s.delta);
+      const Pe_f=getPeState(s);
       s.A1_num+=Math.max(0,Pm_eff-Pe_f)*Math.abs(WS*s.omega*dt);
     }
     if(s.eac_phase==='post'){
       if(s.omega>0){
         if(s.delta>s.delta_cleared){
-          const Pe_p=Pmax_b*Math.sin(s.delta);
+          const Pe_p=getPeState(s);
           s.A2_num+=Math.max(0,Pe_p-Pm_eff)*Math.abs(WS*s.omega*dt);
         }
       }else{
@@ -883,9 +934,11 @@ function updateParticles(s,dt){
 function setNarr(t){S.narr=t;document.getElementById('narrtxt').textContent=t;}
 function autoNarr(s){
   if(s._scnarr)return;
-  const Pmax=s.Ef*s.V/s.Xs,Pe=getPe(s);
+  const Pmax=getPmaxSal(s),Pe=getPe(s);
   const Pm_eff=getPmEff(s);
-  const d_s=Math.asin(Math.min(Pm_eff/Pmax,0.9999))*R2D,d_cr=180-d_s;
+  const d_s=solveDelta0(Pm_eff,Pmax,s.Xs,getMachineXq(s),getVt(s));
+  const dcr=solveDeltaCr(Pm_eff,Pmax,s.Xs,getMachineXq(s),getVt(s));
+  const d_cr=(dcr===null?Math.PI:dcr)*R2D;
   const ddeg=s.delta*R2D,acc=Pm_eff-Pe;
   // Rate-limit 2 Hz: teks narasi tidak berganti lebih cepat dari yang bisa
   // dibaca. Kejadian penting (fault, OOS, verdict EAC) melewati limit ini
@@ -906,9 +959,11 @@ function autoNarr(s){
   setNarr(`Setimbang. δ=${ddeg.toFixed(2)}°, Pe≈Pm=${Pe.toFixed(4)} pu. t_cc=${tcc?tcc.toFixed(3)+'s':'N/A'}.`);
 }
 function updateCards(s){
-  const Pmax=s.Ef*s.V/s.Xs,Pe=getPe(s);
+  const Pmax=getPmaxSal(s),Pe=getPe(s);
   const Pm_eff=getPmEff(s),acc=Pm_eff-Pe;
-  const d_cr=Math.PI-Math.asin(Math.min(Pm_eff/Pmax,0.9999));
+  const d0=solveDelta0(Pm_eff,Pmax,s.Xs,getMachineXq(s),getVt(s));
+  const dcr=solveDeltaCr(Pm_eff,Pmax,s.Xs,getMachineXq(s),getVt(s));
+  const d_cr=dcr===null?Math.PI:dcr;
   const margin=(d_cr-Math.abs(s.delta))*R2D;
   const accEl=document.getElementById('sc_acc'),ca=document.getElementById('card-acc');
   accEl.textContent=(acc>=0?'+':'')+acc.toFixed(5)+' pu';
@@ -1277,9 +1332,11 @@ function updateSvgPhasor(){
   }
 
   // Data panels
-  const Pmax=S.Ef*S.V/S.Xs, Pe=getPe(S);
+  const Pmax=getPmaxSal(S), Pe=getPe(S);
   const Pm_eff=getPmEff(S);
-  const d_s=Math.asin(Math.min(Pm_eff/Pmax,0.9999))*R2D, d_cr=180-d_s;
+  const d0=solveDelta0(Pm_eff,Pmax,S.Xs,getMachineXq(S),getVt(S));
+  const dcr=solveDeltaCr(Pm_eff,Pmax,S.Xs,getMachineXq(S),getVt(S));
+  const d_s=(d0===null?0:d0)*R2D, d_cr=(dcr===null?Math.PI:dcr)*R2D;
   const fD=S.mode==='grid'?F0:F0*(1+S.omega);
   const Ks=Pmax*Math.cos(S.delta);
   const Tosc=Ks>0.01?2*Math.PI*Math.sqrt(2*S.H/(WS*Ks)):null;
@@ -1784,10 +1841,10 @@ function updateSvgPdelta(){
 
   const ml=58,mr=18,mt=30,mb=52;
   const pw=w-ml-mr,ph=h-mt-mb;
-  const Pmax=S.Ef*S.V/S.Xs,Pm_eff=getPmEff(S);
-  const Pmax_f=Pmax*S.sc_Pfact;
-  const d_s=Math.asin(Math.min(Pm_eff/Pmax,.9999));
-  const d_cr=Math.PI-d_s, d_cc=getCC(S);
+  const Pmax=getPmaxSal(S),Pm_eff=getPmEff(S);
+  const Xq=getMachineXq(S), Pmax_f=S.Ef*(S.V*S.sc_Pfact)/Math.max(S.Xs,0.01);
+  const d_s=solveDelta0(Pm_eff,Pmax,S.Xs,Xq,S.V);
+  const d_cr=solveDeltaCr(Pm_eff,Pmax,S.Xs,Xq,S.V)||Math.PI, d_cc=getCC(S);
   const yMax=Pmax*1.18;
   const f2=v=>v.toFixed(1);
   const sx=d=>(ml+(d/Math.PI)*pw).toFixed(1);
@@ -2812,22 +2869,27 @@ function updTrack(el){
   const pct=((+el.value-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';
   el.style.setProperty('--pct',pct);
 }
+function applyControlValue(key,value){
+  if(key==='Ef') setIf(S,value); // kontrol lama dipetakan ke I_f selama migrasi FEM
+  else S[key]=value;
+}
+function controlValue(key){ return key==='Ef' ? S.If : S[key]; }
 function onSl(key,el){
-  if(slidersFrozen()){el.value=S[key];updTrack(el);return;} // tiket 09.6: fisika beku pasca-trip
-  S[key]=+el.value;updTrack(el);document.getElementById('n'+key).value=(+el.value).toFixed(3);
+  if(slidersFrozen()){el.value=controlValue(key);updTrack(el);return;} // tiket 09.6: fisika beku pasca-trip
+  applyControlValue(key,+el.value);updTrack(el);document.getElementById('n'+key).value=controlValue(key).toFixed(3);
 }
 function numSl(key,el){
-  if(slidersFrozen()){const cur=S[key];el.value=cur.toFixed(3);const s0=document.getElementById('s'+key);s0.value=cur;updTrack(s0);return;}
+  if(slidersFrozen()){const cur=controlValue(key);el.value=cur.toFixed(3);const s0=document.getElementById('s'+key);s0.value=cur;updTrack(s0);return;}
   const sl=document.getElementById('s'+key);
   const v=Math.max(+sl.min,Math.min(+sl.max,+el.value));
-  S[key]=v;sl.value=v;updTrack(sl);el.value=v.toFixed(3);
+  applyControlValue(key,v);sl.value=v;updTrack(sl);el.value=controlValue(key).toFixed(3);
 }
 function adjSl(key,dir){
   if(slidersFrozen())return; // tiket 09.6: fisika beku pasca-trip
   const sl=document.getElementById('s'+key);
   const v=Math.max(+sl.min,Math.min(+sl.max,+sl.value+dir*.001));
-  sl.value=v.toFixed(3);S[key]=v;updTrack(sl);
-  document.getElementById('n'+key).value=v.toFixed(3);
+  sl.value=v.toFixed(3);applyControlValue(key,v);updTrack(sl);
+  document.getElementById('n'+key).value=controlValue(key).toFixed(3);
 }
 function trigSC(){
   S.sc_delay=+document.getElementById('scDelay').value||0.3;
@@ -3116,11 +3178,14 @@ function procEvts(s){
 }
 function uiSl(id,val){
   const sl=document.getElementById('s'+id),n=document.getElementById('n'+id);
+  // Saat transisi FEM, kontrol If belum hadir di UI lama; state tetap menjadi
+  // sumber kebenaran dan kontrol baru akan tersedia setelah plan visualisasi.
+  if(!sl)return;
   sl.value=val;updTrack(sl);if(n)n.value=(+val).toFixed(3);
 }
 const SCENARIOS={
   load_step:{
-    init(s){s.Pm=0.4;s.Ef=1.5;s.H=8;uiSl('Pm','0.4');setMode('grid');},
+    init(s){setIf(s,1.5);s.Pm=0.4;s.H=8;uiSl('Pm','0.4');setMode('grid');},
     evts:[
       {t:1.5,n:'Pm=0.40 pu, beban ringan. δ≈11°. Sistem sangat stabil.'},
       {t:4,fn(s){s.Pm=0.85;uiSl('Pm','0.85');},n:'LOAD STEP: Pm→0.85 pu. Pm > Pe → rotor dipercepat (Δω↑, δ naik). Pe=Pmax·sin(δ) akan menyesuaikan. (Kundur, 1994 §11.1)'},
@@ -3128,7 +3193,7 @@ const SCENARIOS={
       {t:20,n:'Steady-state baru: δ lebih besar, Δω=0, Pe=Pm=0.85 pu. Grid mode: f=50 Hz sepanjang transien.'},
     ]},
   grid_island:{
-    init(s){s.Pm=0.55;s.Ef=1.5;s.H=8;uiSl('Pm','0.55');setMode('grid');},
+    init(s){setIf(s,1.5);s.Pm=0.55;s.H=8;uiSl('Pm','0.55');setMode('grid');},
     evts:[
       {t:1.5,n:'GRID MODE aktif. Siapkan load step...'},
       {t:3.5,fn(s){s.Pm=0.85;uiSl('Pm','0.85');},n:'Load step di GRID MODE. f(t) hampir flat — infinite bus menyerap gangguan.'},
@@ -3138,7 +3203,7 @@ const SCENARIOS={
       {t:28,n:'Terbukti: Grid → f flat. Island → f berdeviasi nyata.'},
     ]},
   sc_success:{
-    init(s){s.Pm=0.5;s.Ef=1.5;s.H=8;s.sc_delay=0.1;s.sc_dur=0.15;uiSl('Pm','0.5');setMode('grid');},
+    init(s){setIf(s,1.5);s.Pm=0.5;s.H=8;s.sc_delay=0.1;s.sc_dur=0.15;uiSl('Pm','0.5');setMode('grid');},
     evts:[
       {t:1.5,n:'Pm=0.50 pu. SC pendek (0.15s). t_cc≈0.55s. Durasi SC << CCT → AKAN RECOVER.'},
       {t:3.5,fn(s){s.sc_on=true;s.sc_t0=s.t;s.sc_delay=0.1;s.sc_dur=0.15;},n:'3-PHASE SC! Pe≈4%. Area A₁ (merah) terbentuk di kurva EAC. Rotor dipercepat.'},
@@ -3146,18 +3211,18 @@ const SCENARIOS={
       {t:9,n:'Rotor berosilasi teredam. Sinkronisasi DIPERTAHANKAN.'},
     ]},
   sc_fail:{
-    init(s){s.Pm=0.75;s.Ef=1.5;s.H=8;s.sc_delay=0.1;s.sc_dur=0.65;uiSl('Pm','0.75');setMode('grid');},
+    init(s){setIf(s,1.5);s.Pm=0.75;s.H=8;s.sc_delay=0.1;s.sc_dur=0.65;uiSl('Pm','0.75');setMode('grid');},
     evts:[
       {t:1.5,n:'Pm=0.75 pu (berat). t_cc≈0.38s. SC=0.65s >> CCT → TIDAK STABIL.'},
       {t:3.5,fn(s){s.sc_on=true;s.sc_t0=s.t;s.sc_delay=0.1;s.sc_dur=0.65;},n:'SC! Pe≈0. A₁ tumbuh cepat melewati batas...'},
       {t:6,n:'KEHILANGAN SINKRONISASI. δ > π. Rotor pull-out. Trip unit diperlukan.'},
     ]},
   overexcitation:{
-    init(s){s.Pm=0.6;s.Ef=1.0;s.H=8;uiSl('Pm','0.6');uiSl('Ef','1.0');setMode('grid');},
+    init(s){setIf(s,1.0);s.Pm=0.6;s.H=8;uiSl('Pm','0.6');uiSl('If','1.0');setMode('grid');},
     evts:[
-      {t:1.5,n:"Ef=1.0 pu. Pmax=0.833 pu. δ₀=46°. Margin ke δ_cr=88°. Q=−0.255 pu, pf 0.920 LEADING — generator menyerap daya reaktif (underexcited)."},
-      {t:4,fn(s){s.Ef=1.5;uiSl('Ef','1.5');},n:'Ef→1.5 pu. Pmax=1.25 pu. Kurva P-δ naik! δ₀=29°. Margin=123°. Q berbalik ke +0.263 pu, pf 0.916 lagging — kini menyuplai reaktif.'},
-      {t:12,fn(s){s.Ef=2.0;uiSl('Ef','2.0');},n:'Ef=2.0 pu. Pmax=1.67 pu. δ₀≈21°. Q=+0.722 pu, pf 0.639 lagging — overexcited berat, arus stator naik demi reaktif.'},
+      {t:1.5,n:"If=1.0 pu. E_af=1.0 pu. Pmax=0.833 pu. δ₀=46°. Margin ke δ_cr=88°. Q=−0.255 pu, pf 0.920 LEADING — generator menyerap daya reaktif (underexcited)."},
+      {t:4,fn(s){setIf(s,1.5);uiSl('If','1.5');},n:'If→1.5 pu. E_af mengikuti OCC dan mulai jenuh. Kurva P-δ naik; generator menyuplai lebih banyak reaktif.'},
+      {t:12,fn(s){setIf(s,2.0);uiSl('If','2.0');},n:'If=2.0 pu. E_af dibatasi saturasi OCC. Q meningkat; generator overexcited dan arus stator naik demi reaktif.'},
     ]},
 };
 function runSc(name){

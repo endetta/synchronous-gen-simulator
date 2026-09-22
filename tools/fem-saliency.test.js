@@ -34,5 +34,21 @@ const ok = (c, m) => { if (c) console.log(`  ✓ ${m}`); else { failed++; consol
   ok(dcc > d0Salient && dcc < dcr, 'critical clearing angle lies between equilibrium and critical angle');
   const cct = solveCCT(dcc, Pm, Pmax, Xd, XqSalient, V, H);
   ok(cct > 0.05 && cct < 1, `salient CCT is finite, got ${cct}`);
+
+  // ==== Integrasi state: If → Eaf → persamaan salient ====
+  const s = M.makeState();
+  M.setIf(s, 1);
+  close(s.Ef, 1, 1e-12, '1 pu field current derives 1 pu internal voltage');
+  M.setIf(s, 3);
+  ok(s.Ef < 1.55 && s.Ef > M.getEaf(1), 'high field current saturates derived E_af');
+  s.poleCount = 4; s.Pm = 0.8; s.Xs = 1.2; s.V = 1; s.Ef = M.getEaf(1.5);
+  const salient = M.getPeState({ ...s, delta: Math.PI / 6 });
+  const round = M.getPeSal(Math.PI / 6, s.Ef * s.V / s.Xs, s.Xs, s.Xs, s.V);
+  ok(salient > round, 'four-pole state includes reluctance torque');
+
+  const src = require('fs').readFileSync(HTML, 'utf8');
+  const scenarioBlock = src.slice(src.indexOf('const SCENARIOS={'), src.indexOf('function runSc('));
+  ok(!/s\.Ef\s*=/.test(scenarioBlock), 'no scenario writes S.Ef directly (would bypass saturation)');
+  ok(!/uiSl\('Ef'/.test(scenarioBlock), 'no scenario drives the old Ef slider');
   if (failed) process.exit(1);
 })().catch((e) => { console.error(e); process.exit(1); });

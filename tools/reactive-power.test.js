@@ -310,7 +310,7 @@ assert(/qValues/.test(html), 'Skala grafik menyertakan qValues');
 // ================================================================
 console.log('\nTest 10: Narasi preset Overexcitation mengungkap Q');
 const narasi = [...html.matchAll(/\bn:(["'])((?:(?!\1).)*)\1/g)].map((m) => m[2]);
-const narasiOverexc = narasi.filter((n) => /Ef[=→]/.test(n));
+const narasiOverexc = narasi.filter((n) => /(If|Ef)[=→]/.test(n));
 
 assert(narasiOverexc.length >= 3, `Ada >=3 narasi preset Overexcitation (ditemukan ${narasiOverexc.length})`);
 assert(narasiOverexc.some((n) => /lead|leading/i.test(n)),
