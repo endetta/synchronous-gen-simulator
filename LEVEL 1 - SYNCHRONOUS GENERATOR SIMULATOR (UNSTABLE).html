@@ -528,6 +528,81 @@ function slotCount(poleCount){ return 6 * poleCount; }
 function coilsPerPhase(poleCount){ return 2 * poleCount; }
 function elecAngle(mechAngle, poleCount){ return polePairs(poleCount) * mechAngle; }
 
+// ================================================================
+// PERSAMAAN MESIN SALIENT — daya listrik dengan suku reluctance.
+// Pe(δ) = Pmax·sin δ + (V²/2)·(1/Xq − 1/Xd)·sin 2δ
+// Saat Xq = Xd (round rotor, 2 kutub) suku kedua lenyap dan hasilnya identik
+// dengan rumus lama. Sudut kesetimbangan & batas stabilitas diselesaikan
+// numerik (bisection) karena persamaan salient tidak punya bentuk tertutup.
+// Ref: Kundur (1994) §5.2; Anderson & Fouad (2003) §2.4.
+// ================================================================
+function getPeSal(delta, Pmax, Xd, Xq, V){
+  const sal = Math.abs(Xq - Xd) < 1e-12 ? 0 : (V * V / 2) * (1 / Xq - 1 / Xd) * Math.sin(2 * delta);
+  return Pmax * Math.sin(delta) + sal;
+}
+function dPeSal(delta, Pmax, Xd, Xq, V){
+  const sal = Math.abs(Xq - Xd) < 1e-12 ? 0 : V * V * (1 / Xq - 1 / Xd) * Math.cos(2 * delta);
+  return Pmax * Math.cos(delta) + sal;
+}
+function solveDelta0(Pm, Pmax, Xd, Xq, V){
+  let lo = 0, hi = Math.PI / 2;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (getPeSal(mid, Pmax, Xd, Xq, V) < Pm) lo = mid; else hi = mid;
+  }
+  const d = (lo + hi) / 2;
+  return dPeSal(d, Pmax, Xd, Xq, V) > 0 ? d : null;
+}
+// Puncak kurva Pe (dPe/dδ = 0). Selalu di (0, π/2) untuk mesin ini.
+function peakDelta(Pmax, Xd, Xq, V){
+  let lo = 0, hi = Math.PI / 2;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (dPeSal(mid, Pmax, Xd, Xq, V) > 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+// δ_cr = titik kesetimbangan TIDAK stabil: Pe(δ) turun melewati Pm lagi.
+// Untuk round rotor hasilnya persis π − δ₀; saliency menggesernya lebih awal.
+function solveDeltaCr(Pm, Pmax, Xd, Xq, V){
+  const d0 = solveDelta0(Pm, Pmax, Xd, Xq, V);
+  if (d0 === null) return null;
+  const peak = peakDelta(Pmax, Xd, Xq, V);
+  if (getPeSal(peak, Pmax, Xd, Xq, V) <= Pm) return null; // Pm di atas puncak → tak ada kesetimbangan
+  let lo = peak, hi = Math.PI - 1e-6;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (getPeSal(mid, Pmax, Xd, Xq, V) - Pm > 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+function area(from, to, fn){
+  const n = 240;
+  const h = (to - from) / n;
+  let sum = 0.5 * (fn(from) + fn(to));
+  for (let i = 1; i < n; i++) sum += fn(from + i * h);
+  return sum * h;
+}
+function solveDeltaCc(Pm, Pmax, Xd, Xq, V){
+  const d0 = solveDelta0(Pm, Pmax, Xd, Xq, V);
+  const dcr = solveDeltaCr(Pm, Pmax, Xd, Xq, V);
+  if (d0 === null || dcr === null) return null;
+  const a1 = (dc) => area(d0, dc, (d) => Math.max(0, Pm - 0.04 * getPeSal(d, Pmax, Xd, Xq, V)));
+  const a2 = (dc) => area(dc, dcr, (d) => Math.max(0, getPeSal(d, Pmax, Xd, Xq, V) - Pm));
+  let lo = d0, hi = dcr;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if (a2(mid) > a1(mid)) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+function solveCCT(dcc, Pm, Pmax, Xd, Xq, V, H){
+  const d0 = solveDelta0(Pm, Pmax, Xd, Xq, V);
+  if (dcc === null || d0 === null || Pm <= 0) return null;
+  const accelerating = area(d0, dcc, (d) => Math.max(0, Pm - 0.04 * getPeSal(d, Pmax, Xd, Xq, V)));
+  return Math.sqrt(Math.max(0, 4 * H * accelerating / (2 * Math.PI * 50 * Pm)));
+}
+
 function makeState(){
   const H  = parseValidNumber(document.getElementById('sH').value, 8.0, 1, 15, 'Inertia H');
   const D  = parseValidNumber(document.getElementById('sD').value, 4.0, 0, 15, 'Damping D');
