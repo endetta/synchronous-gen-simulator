@@ -78,11 +78,13 @@ async function makeExtractor(htmlPath) {
       'getPe','getPmax','getQe','getS','getPF','getPFNature','getCC','getCCT','getVt',
       'getPmEff','govActive','getA2Available','eacStable','snapEac','freezeSliders','slidersFrozen',
       'setNarr','autoNarr','updateCards','updateHdr','getRLRLoad','getRLRPeriod',
-      'satCurve','getEaf','getFluxDensity'];
+      'satCurve','getEaf','getFluxDensity',
+      'polePairs','getXq','slotCount','coilsPerPhase','elecAngle'];
     const out = {};
     for (const n of names) out[n] = _get(n);
     out.EAC_TOL = (typeof EAC_TOL !== 'undefined') ? EAC_TOL : undefined;
     out.OCC_PEAK = _get('OCC_PEAK');
+    out.SAL_RATIO = _get('SAL_RATIO');
     out.getS_ = () => S;
     out.setS_ = (v) => { S = v; };
     out.rlr_state = () => rlr_running;
@@ -108,6 +110,7 @@ async function makeExtractor(htmlPath) {
     'freezeSliders', 'slidersFrozen', 'setNarr', 'updateCards', 'updateHdr',
     'ode', 'rk4', 'stepPhys', 'doReset', 'trigSC', 'setMode', 'runSc',
     'getRLRLoad', 'satCurve', 'getEaf', 'getFluxDensity',
+    'polePairs', 'getXq', 'slotCount', 'coilsPerPhase', 'elecAngle',
   ];
   const missing = REQUIRED.filter(k => typeof mod[k] !== 'function');
   if (missing.length > 0) {

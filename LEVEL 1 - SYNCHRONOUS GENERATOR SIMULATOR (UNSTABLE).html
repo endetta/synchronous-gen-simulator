@@ -515,6 +515,19 @@ function satCurve(If){
 function getEaf(If){ return satCurve(If); }
 function getFluxDensity(If){ return satCurve(If) / OCC_PEAK; }
 
+// ================================================================
+// GEOMETRI KUTUB — jumlah kutub menentukan saliency dan pola belitan.
+// 2 kutub = round rotor (Xq = Xd, torsi reluctance nol); 4/6/8 kutub =
+// salient (Xq/Xd = 0.65). Rasio tetap, tanpa slider baru.
+// Ref: Kundur (1994) §3.3, §5.2 (salient-pole rotor, Xd/Xq).
+// ================================================================
+const SAL_RATIO = { 2: 1.00, 4: 0.65, 6: 0.65, 8: 0.65 };
+function polePairs(poleCount){ return poleCount / 2; }
+function getXq(Xd, poleCount){ return Xd * SAL_RATIO[poleCount]; }
+function slotCount(poleCount){ return 6 * poleCount; }
+function coilsPerPhase(poleCount){ return 2 * poleCount; }
+function elecAngle(mechAngle, poleCount){ return polePairs(poleCount) * mechAngle; }
+
 function makeState(){
   const H  = parseValidNumber(document.getElementById('sH').value, 8.0, 1, 15, 'Inertia H');
   const D  = parseValidNumber(document.getElementById('sD').value, 4.0, 0, 15, 'Damping D');
