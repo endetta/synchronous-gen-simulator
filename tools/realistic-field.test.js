@@ -90,6 +90,18 @@ ok(initReal.includes('id:`label-${i}`'), 'one upright label is created per pole'
 ok(updReal.includes('rotate(-${deg(rotorAng)}'), 'labels receive counter-rotation');
 ok(initReal.includes('protrude:S.poleCount>2'), 'more than two poles use salient magnets');
 
+sect('Test 3d: Legenda realistis penuh + warning');
+const legendFn = fn('drawRealisticLegend');
+ok(legendFn.includes('Magnet batangan rotor'), 'legenda: magnet batangan');
+ok(legendFn.includes('Sumbu-d rotor'), 'legenda: sumbu-d');
+ok(legendFn.includes('Sumbu-q rotor'), 'legenda: sumbu-q');
+ok(legendFn.includes('Air gap'), 'legenda: air gap');
+ok(legendFn.includes('RMF stator'), 'legenda: RMF');
+ok(legendFn.includes('Garis fluks'), 'legenda: garis fluks');
+ok(legendFn.includes('Belitan stator'), 'legenda: belitan stator');
+ok(legendFn.includes('Penyederhanaan'), 'warning penyederhanaan ada');
+ok(legendFn.includes('mesh'), 'warning menyebut BUKAN mesh FEM penuh');
+
 sect('Test 4: Penanda arah arus dot/cross (konvensi +z/−z)');
 ok(realSec.includes('buildCurrentMarker'), 'penanda dot/cross dibuat via buildCurrentMarker()');
 ok(realSec.includes("'-dot'") && realSec.includes("'-x'"), 'sepasang penanda dot dan cross ada');

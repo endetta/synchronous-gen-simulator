@@ -1769,19 +1769,25 @@ function updateSvgPhasorRealistic(svg){
 }
 
 function drawRealisticLegend(svg,w,h){
-  const legendX=10, legendY=h-104;
+  const legendX=10, legendY=h-180;
   const items=[
-    {label:'Garis fluks (rapat ∝ eksitasi)',color:'#2f6fb0'},
+    {label:'Garis fluks (kerapatan ∝ B(I_f) — solver medan)',color:'#2f6fb0'},
+    {label:'Magnet batangan rotor — N / S',color:'#0068d8'},
+    {label:'Belitan stator fasa A/B/C',color:'#c85000'},
     {label:'RMF stator (medan 3-φ berputar)',color:'#30a060'},
-    {label:'Kumparan stator A/B/C',color:'#c85000'},
-    {label:'Sumbu-d rotor (kutub N)',color:'#d84000'},
-    {label:'Sumbu-q rotor',color:'#3a6818'},
+    {label:'Sumbu-d rotor (sejajar belitan medan, kutub N)',color:'#d84000'},
+    {label:'Sumbu-q rotor (90° elektrik di depan d)',color:'#3a6818'},
+    {label:'Air gap',color:'#c0c8d8'},
+    {label:'Busur δ — sudut daya (sama Panel II)',color:'#a86000'},
   ];
   items.forEach((it,i)=>{
     const y=legendY+i*16;
     svg.appendChild(mkSvg('rect',{x:legendX,y:y,width:12,height:12,fill:it.color,stroke:'#404858','stroke-width':0.5,'rx':2}));
     svg.appendChild(mkSvg('text',{x:legendX+18,y:y+10,'font-size':11,fill:'#505868','font-family':'var(--body)'},it.label));
   });
+  const wy=legendY+items.length*16+12;
+  svg.appendChild(mkSvg('text',{x:legendX,y:wy,'font-size':10,fill:'#707888','font-family':'var(--body)'},
+    '⚠ Penyederhanaan: medan sinusoidal + saturasi tanh + reaksi armature superposisi — BUKAN mesh FEM penuh.'));
 }
 
 // ================================================================
