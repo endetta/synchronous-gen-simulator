@@ -423,12 +423,12 @@ const TIPS={
       effect:"I_f naik → E_af naik (ter-saturasi) → P_max naik → kurva P-δ lebih tinggi → margin EAC lebih besar. (Kundur 1994 §3.2)"},
 };
 const EAC_TIPS={
-  dcr:{title:'δ_cr — Critical Angle (π − δ₀)',
-       desc:'Jika δ melewati δ_cr, Pe TURUN saat δ naik → positive feedback → rotor tidak pernah deselerasi → KEHILANGAN SINKRONISASI. δ_cr = π − δ₀. (Anderson & Fouad, 2003 §2.3)'},
+  dcr:{title:'δ_cr — Critical Angle',
+       desc:'Jika δ melewati δ_cr, Pe TURUN saat δ naik → positive feedback → rotor tidak pernah deselerasi → KEHILANGAN SINKRONISASI. Untuk mesin salient-pole (4/6/8 kutub), δ_cr dihitung numerik (akar dP/dδ = 0) — bukan π − δ₀; untuk round rotor (2 kutub) hasilnya sama. (Anderson & Fouad, 2003 §2.3)'},
   dcc:{title:'δ_cc — Critical Clearing Angle',
-       desc:'Sudut maksimum saat SC boleh di-clear agar EAC terpenuhi. δ_cc = arccos[Pm(π−2δ₀)/Pmax − cos δ₀]. Jika SC di-clear sebelum δ mencapai δ_cc → A₂ ≥ A₁ → STABIL. (Kundur, 1994 eq.11.13)'},
+       desc:'Sudut maksimum saat SC boleh di-clear agar EAC terpenuhi. Untuk salient-pole, δ_cc dari integrasi numerik A1(δ_cc) = A2(δ_cc). Jika SC di-clear sebelum δ mencapai δ_cc → A₂ ≥ A₁ → STABIL. (Kundur, 1994 eq.11.13)'},
   d0:{title:'δ₀ — Initial Equilibrium Angle',
-      desc:'Sudut daya steady-state: δ₀ = arcsin(Pm/Pmax). Titik operasi sebelum gangguan. Makin besar Pm/Pmax, makin besar δ₀ dan makin kecil margin ke δ_cr. (Kundur, 1994 §11.2)'},
+      desc:'Sudut daya steady-state. Untuk salient-pole, δ₀ dari bisection P(δ₀) = Pm pada cabang stabil. Makin besar Pm/Pmax, makin besar δ₀ dan makin kecil margin ke δ_cr. (Kundur, 1994 §11.2)'},
   pm:{title:'Pm — Mechanical Power Line',
       desc:'Garis horizontal menunjukkan daya mekanik. Di atas kurva P-δ = zona deselerasi; di bawah = zona akselerasi. (Kundur, 1994 §11.1)'},
   pmax:{title:'Pmax — Maximum Transferable Power',
@@ -1941,8 +1941,9 @@ function updateSvgPdelta(){
     tx.textContent=deg+'°'; xl.appendChild(tx);
   });
 
-  // Main curve
-  let cpts=''; for(let d=0;d<=Math.PI;d+=0.006) cpts+=(d===0?'M':'L')+sx(d)+','+sy(Pmax*Math.sin(d))+' ';
+  // Main curve — salient: getPeSal (Pmax·sin δ + suku reluctance Xq<Xd).
+  // Puncak bergeser ke kiri saat Xq<Xd — benar secara fisik (spec §4.4).
+  let cpts=''; for(let d=0;d<=Math.PI;d+=0.006){ const v=getPeSal(d,Pmax,S.Xs,Xq,S.V); cpts+=(d===0?'M':'L')+sx(d)+','+sy(v)+' '; }
   setA('pd-curve',{d:cpts.trim()});
   setA('pd-pmax-t',{x:sx(Math.PI/2),y:f2(parseFloat(sy(Pmax))-4)});
   setT('pd-pmax-t','Pmax='+Pmax.toFixed(3)+' pu');
@@ -1975,6 +1976,8 @@ function updateSvgPdelta(){
     setA('pd-h-dcc',{x:f2(parseFloat(sx(d_cc))-12),y:f2(mt),width:'24',height:f2(ph)});
   }else{setV('pd-dcc',false);setV('pd-dcc-t',false);setV('pd-h-dcc',false);}
 
+  // P_fault hanya memakai Pmax_f·sin(d): saat short circuit tegangan terminal
+  // kolaps (constant flux linkage, E' tetap), suku reluctance praktis hilang.
   // Fault curve + EAC areas
   const showEAC=S.sc_on||S.sc_active||S.eac_phase==='post'||S.eac_phase==='done';
   if(showEAC||S.sc_active){
@@ -3299,8 +3302,9 @@ const SCENARIOS={
 function runSc(name){
   const sc=SCENARIOS[name];if(!sc)return;
   doReset(false);sc.init(S);
-  const Pmax=S.Ef*S.V/S.Xs;
-  S.delta=Math.asin(Math.min(Math.max(S.Pm/Pmax,-.9999),.9999));
+  const Pmax=getPmaxSal(S);
+  const d0=solveDelta0(S.Pm,Pmax,Math.max(S.Xs,0.01),getMachineXq(S),S.V);
+  S.delta=d0!==null?d0:Math.asin(Math.min(Math.max(S.Pm/Pmax,-.9999),.9999));
   S.omega=0;S.Xg=0;S.Pm_gov=0;S.t=0;S.hist=[];S.hlast=-1e9;lastChartCommit=0;
   S.eac_phase='none';S.A1_num=0;S.A2_num=0;S.eac_snap=null;
   S.evts=sc.evts.map(e=>({...e}));S.ev_t0=0;
