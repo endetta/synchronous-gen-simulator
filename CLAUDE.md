@@ -193,6 +193,26 @@ synchronism — bug yang diperbaiki di commit `12125cc` dan dijaga oleh
     ber-apostrof ke dalam string shell (memicu `InputValidationError`); andalkan
     working directory sesi, jangan mengulang `cd` yang sama.
 
+12. **Checklist anti-gagal tool (post-mortem 2026-09-23).** 8 dari 9 error "edit
+    file"/`InputValidationError` berulang bukan bug tool, melainkan pemakaian salah.
+    Wajib sebelum tiap edit/substantif:
+    - **Satu Edit per file per blok** — dua Edit ke file SAMA dalam satu blok paralel
+      memakai snapshot basi → error "File has been unexpectedly modified".
+    - **`old_string` unik** — `grep -n` dulu; sertakan 2-3 baris konteks, atau
+      `replace_all:true` bila sengaja (error "Found 2 matches").
+    - **Read area sekitar dulu** sebelum Edit — cegah duplikat nama/var
+      (`SyntaxError` pasca-Edit).
+    - **Jangan `node -e` kompleks di PowerShell** (quote/`$`/kurawal dimakan shell) —
+      tulis file `.js` sementara lalu `node file.js`.
+    - **Strip komentar dulu untuk assertion substring** — `Date.now()` di komentar
+      "BUKAN Date.now()" terhitung false positive (pola `stripComments` di tes).
+    - **CRLF-safe** — file HTML ini CRLF (3425 baris); jangan asumsi LF
+      (`indexOf('\n}\n')` gagal); normalisasi `\r\n`→`\n` saat parsing teks file.
+    - **Jangan panggil tool dengan param kosong** — isi `file_path`/`pattern` eksplisit.
+    - **`InputValidationError: could not be parsed as JSON` berulang** = transien dari
+      rantai router (`routers9-starter`, translasi /v1/chat/completions) — SATU tool
+      call per blok (juga mencegah 2-Edit-paralel), retry saat kena, jangan galau.
+
 ## Fitur Saat Ini
 
 1. **Visualisasi:**
