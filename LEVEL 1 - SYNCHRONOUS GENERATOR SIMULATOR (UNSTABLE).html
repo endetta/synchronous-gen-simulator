@@ -206,6 +206,15 @@ body.is-dragging .amode-btn,body.is-dragging .pane-resize button{pointer-events:
           <button class="amode-btn active" id="amode-phasor" onclick="setAnimMode('phasor')">Fasor</button>
           <button class="amode-btn" id="amode-realistic" onclick="setAnimMode('realistic')">Realistis</button>
         </div>
+        <div style="position:absolute;top:8px;right:190px;z-index:5;font-size:11px;font-family:var(--body)">
+          <span style="color:var(--dim)">Kecepatan</span>
+          <select id="visSpeed" onchange="onVisSpeedChange(this)" style="font-size:11px;padding:1px;color:var(--amber);font-family:var(--mono)">
+            <option value="0.25">0.25 Hz</option>
+            <option value="0.5">0.5 Hz</option>
+            <option value="1" selected>1 Hz</option>
+            <option value="2">2 Hz</option>
+          </select>
+        </div>
         <svg id="svgPhasor" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"></svg>
         <div class="pane-resize" data-pane-resize="pane1">
           <span class="prz-size" data-pane-size="pane1"></span>
@@ -262,6 +271,25 @@ body.is-dragging .amode-btn,body.is-dragging .pane-resize button{pointer-events:
         <div class="scard" style="border-left-color:#6040a0"><div class="scard-lbl">Qe Reactive Out</div><div class="scard-val" id="sc_q" style="color:#6040a0">+0.0000 pu</div></div>
         <div class="scard" style="border-left-color:var(--green)"><div class="scard-lbl">pf / S Apparent</div><div class="scard-val" id="sc_pf" style="color:var(--green)">— / — pu</div></div>
         <div class="scard" style="border-left-color:var(--etap);grid-column:1/-1"><div class="scard-lbl">EAC Status · δ<sub>cc</sub> · t<sub>cc</sub></div><div class="scard-val" id="sc_eac" style="color:var(--txt2);font-size:12px">—</div></div>
+      </div>
+    </div>
+    <!-- MESIN -->
+    <div class="csec">
+      <div class="stitle">MESIN <span style="font-size:9px;color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none">saliency &amp; geometri kutub</span></div>
+      <div style="font-family:var(--body);font-size:12.5px;color:var(--txt2);margin-bottom:8px;line-height:1.6">Jumlah kutub menentukan slot stator, magnet rotor, Xq, dan torsi reluctance. I<sub>f</sub> = arus medan (AVR) → E' = OCC(I<sub>f</sub>) dengan saturasi.</div>
+      <div class="slg">
+        <div class="slhdr"><span class="sllbl" data-tip="poleCount">Jumlah Kutub</span></div>
+        <select id="poleCount" onchange="onPoleChange(this)" style="width:100%;padding:4px;font-family:var(--mono);font-size:12px">
+          <option value="2">2 — Round Rotor (Xq = Xd)</option>
+          <option value="4">4 — Salient (Xq = 0.65·Xd)</option>
+          <option value="6">6 — Salient (Xq = 0.65·Xd)</option>
+          <option value="8">8 — Salient (Xq = 0.65·Xd)</option>
+        </select>
+      </div>
+      <div class="slg">
+        <div class="slhdr"><span class="sllbl" data-tip="If">I<sub>f</sub> — Arus Medan (AVR)</span><div class="sl-val-row"><button class="sl-adj" onclick="adjSl('If',-1)">▾</button><input class="sl-num" id="nIf" type="number" value="1.000" step="0.001" min="0.2" max="3" onchange="numSl('If',this)"><span class="sl-unit">pu</span><button class="sl-adj" onclick="adjSl('If',1)">▴</button></div></div>
+        <input type="range" id="sIf" min="0.2" max="3" step="0.001" value="1" oninput="onSl('If',this)">
+        <div style="font-size:12px;color:var(--dim);font-style:italic;font-family:var(--body);margin-top:4px">E<sub>af</sub> = <span id="eaf-readout">1.0000</span> pu (hasil OCC)</div>
       </div>
     </div>
     <!-- Generator params -->
@@ -401,6 +429,10 @@ const TIPS={
       range:'Normal: 1.0–1.5 pu | Overexcited: 1.5–2.5 pu',
       desc:"Tegangan internal EMF dikontrol AVR. Dalam model klasik E' ≈ konstan selama transien.",
       effect:"Ef naik → Pmax naik → kurva P-δ lebih tinggi → δ₀ lebih kecil → δ_cr lebih jauh → margin EAC lebih besar → CCT lebih panjang. (Wu & Wang, IEEE JESTPE 2020)"},
+  If:{title:"I_f — Arus Medan (AVR)",unit:'pu',
+      range:'Knee ~1.0 pu | Saturasi asimtot 1.55 pu',
+      desc:"Arus medan generator. E' = OCC(I_f): di atas knee kurva melengkung (saturasi tanh).",
+      effect:"I_f naik → E_af naik (ter-saturasi) → P_max naik → kurva P-δ lebih tinggi → margin EAC lebih besar. (Kundur 1994 §3.2)"},
 };
 const EAC_TIPS={
   dcr:{title:'δ_cr — Critical Angle (π − δ₀)',
@@ -2905,15 +2937,25 @@ function setAnimMode(mode){
   if(phasorBtn) phasorBtn.classList.toggle('active',mode==='phasor');
   if(realisticBtn) realisticBtn.classList.toggle('active',mode==='realistic');
 }
+function onPoleChange(el){
+  S.poleCount = +el.value || 2;
+  // Geometri statis (slot, magnet, kumparan, RMF) ikut poleCount →
+  // wajib rebuild SVG realistis pada frame berikutnya.
+  realInit = false;
+}
+function onVisSpeedChange(el){
+  S.visSpeed = +el.value || 1;
+}
 function updTrack(el){
   const pct=((+el.value-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';
   el.style.setProperty('--pct',pct);
 }
 function applyControlValue(key,value){
-  if(key==='Ef') setIf(S,value); // kontrol lama dipetakan ke I_f selama migrasi FEM
+  if(key==='If'){ setIf(S,value); const e=document.getElementById('eaf-readout'); if(e) e.textContent=S.Ef.toFixed(4); }
+  else if(key==='Ef') setIf(S,value); // shim legacy — dihapus di Task 3
   else S[key]=value;
 }
-function controlValue(key){ return key==='Ef' ? S.If : S[key]; }
+function controlValue(key){ return key==='If' ? S.If : (key==='Ef' ? S.If : S[key]); }
 function onSl(key,el){
   if(slidersFrozen()){el.value=controlValue(key);updTrack(el);return;} // tiket 09.6: fisika beku pasca-trip
   applyControlValue(key,+el.value);updTrack(el);document.getElementById('n'+key).value=controlValue(key).toFixed(3);
@@ -2951,7 +2993,7 @@ function trigSC(){
 // dan trip mengosongkan s.evts — invarian itu dijaga di sana, bukan di sini.
 function slidersFrozen(){ return !!(S && S.oos_tripped); }
 function freezeSliders(frozen){
-  ['sH','sD','sXs','sPm','sEf','nH','nD','nXs','nPm','nEf'].forEach(id=>{
+  ['sH','sD','sXs','sPm','sIf','nH','nD','nXs','nPm','nIf'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.disabled=frozen;
   });
@@ -2966,7 +3008,9 @@ function doReset(full=true){
   freezeSliders(false); // tiket 09.6: lepas kunci slider dari trip sebelumnya
   document.getElementById('bGrid').classList.add('on');
   document.getElementById('bIsland').classList.remove('on');
-  ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
+  ['sH','sD','sXs','sPm','sIf'].forEach(id=>updTrack(document.getElementById(id)));
+  const eaf=document.getElementById('eaf-readout');
+  if(eaf) eaf.textContent=S.Ef.toFixed(4);
   phasorReady=false; pdInit=false; lastChartCommit=0;
   // Reset chart scales on reset
   Object.values(chartStabilizers).forEach(s=>s.reset());
@@ -3397,7 +3441,7 @@ window.addEventListener('load',()=>{
   initTimeCharts();
   initPaneResizeControls();
   initA11yLabels();
-  ['sH','sD','sXs','sPm','sEf'].forEach(id=>updTrack(document.getElementById(id)));
+  ['sH','sD','sXs','sPm','sIf'].forEach(id=>updTrack(document.getElementById(id)));
   drawRLRChart(S);
 
   // Detect user scrolling and pause rendering during scroll
