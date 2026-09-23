@@ -1399,9 +1399,9 @@ const RGEO={
 
 // Cache template garis fluks. Dibangun SEKALI dalam kerangka acuan rotor
 // (sumbu-d di sudut lokal 0), lalu seluruh grupnya dirotasi per frame —
-// atribut `d` TIDAK dihitung ulang tiap frame.
+// atribut `d` TIDAK dihitung ulang tiap frame. Kunci cache mengikuti solver L2.
 // Ref: docs/riset-medan-magnetik-dan-belitan.md §4.3 & §7.3
-const fluxCache={ef:-1,R:0,n:0};
+const fluxCache={If:-1,Id:NaN,Iq:NaN,poleCount:0,R:0,n:0};
 
 // Eksitasi -> kerapatan garis, melengkung (tanh). Saturasi tidak dimodelkan
 // (riset §3.8), jadi pemetaan linear akan melebih-lebihkan rentang Ef:
@@ -1434,39 +1434,46 @@ function buildFluxPath(b,rMax,sgn,cx,cy,R){
   return d;
 }
 
-// Bangun ulang seluruh path fluks. Dipanggil HANYA saat Ef berubah material
-// atau ukuran SVG berubah — bukan tiap frame.
-function rebuildFluxPaths(svg,cx,cy,R,ef){
+// Bangun ulang seluruh path fluks. Solver L2 mengembalikan amplitudo medan rotor
+// dan reaksi armature; template lalu disalin per pasangan kutub. Ini bukan mesh FEM
+// penuh: distribusi sinusoidal jenuh + superposisi armature reaction.
+function rebuildFluxPaths(svg,cx,cy,R,field){
   const g=safeQuerySelector(svg,'#g-flux');
   if(!g) return;
-  const n=fluxCount(ef);
+  const n=Math.max(4,6+Math.round(8*Math.max(0,field.brRot)));
   const span=RGEO.fluxMax-RGEO.fluxMin;
-  let d='';
-  for(let k=0;k<n;k++){
-    // sin(b_k)=(k+1)/(N+1) — konsekuensi B_r ∝ cos(b) pada model sinusoida
-    // Kirtley §2, sehingga tiap tabung fluks membawa fluks sama besar.
-    const b=Math.asin((k+1)/(n+1));
-    const rMax=R*(RGEO.fluxMin+span*(k+1)/(n+1));
-    d+=buildFluxPath(b,rMax, 1,cx,cy,R);
-    d+=buildFluxPath(b,rMax,-1,cx,cy,R);
-  }
+  const pairs=Math.max(1,field.pairs||1);
   while(g.firstChild)g.removeChild(g.firstChild);
-  g.appendChild(mkSvg('path',{
-    d:d,fill:'none',stroke:'#2f6fb0',
-    'stroke-width':Math.max(1,R*0.011),'stroke-linecap':'round','opacity':0.85
-  }));
-  fluxCache.ef=ef; fluxCache.R=R; fluxCache.n=n;
+  for(let pair=0;pair<pairs;pair++){
+    const pairAng=2*Math.PI*pair/pairs;
+    let d='';
+    for(let k=0;k<n;k++){
+      const b=Math.asin((k+1)/(n+1));
+      const rMax=R*(RGEO.fluxMin+span*(k+1)/(n+1))*(0.96+0.04*Math.min(1,field.brRot));
+      const armOffset=field.armQ*0.08;
+      d+=buildFluxPath(b+armOffset,rMax,1,cx,cy,R);
+      d+=buildFluxPath(b+armOffset,rMax,-1,cx,cy,R);
+    }
+    g.appendChild(mkSvg('path',{
+      d:d,fill:'none',stroke:'#2f6fb0',
+      'stroke-width':Math.max(1,R*0.011),'stroke-linecap':'round',
+      opacity:(0.52+0.28*Math.min(1,field.brRot)).toFixed(3),
+      transform:`rotate(${pairAng*180/Math.PI} ${cx} ${cy})`
+    }));
+  }
+  fluxCache.n=n*pairs;
 }
 
 // Kumparan satu fasa sebagai SATU path tersambung: turun lewat slot sisi-masuk,
 // keluar menuju end-winding, melengkung 180° ke slot berseberangan, naik lewat
 // slot sisi-keluar. Kedua sisi kumparan terpisah π/p = 180° mekanis untuk mesin
 // 2-kutub (Kirtley §3). Menggantikan 18 <circle> yang tidak menunjukkan arah.
-function buildCoilPath(cx,cy,R,th,endR){
+function buildCoilPath(cx,cy,R,th,endR,pairs){
   const ci=RGEO.condIn*R, co=RGEO.condOut*R, re=endR*R;
+  const pitch=Math.PI / pairs;
   const P=(r,a)=>[(cx+r*Math.cos(a)).toFixed(1),(cy+r*Math.sin(a)).toFixed(1)];
   const p1=P(ci,th), p2=P(co,th), p3=P(re,th);
-  const p4=P(re,th+Math.PI), p5=P(co,th+Math.PI), p6=P(ci,th+Math.PI);
+  const p4=P(re,th+pitch), p5=P(co,th+pitch), p6=P(ci,th+pitch);
   return `M${p1[0]} ${p1[1]}L${p2[0]} ${p2[1]}L${p3[0]} ${p3[1]}`
        + `A${re.toFixed(1)} ${re.toFixed(1)} 0 0 1 ${p4[0]} ${p4[1]}`
        + `L${p5[0]} ${p5[1]}L${p6[0]} ${p6[1]}`;
@@ -1517,8 +1524,10 @@ function initSvgRealistic(svg,w,h){
   // Stator core (laminated iron)
   svg.appendChild(mkSvg('circle',{id:'stator-core',cx:cx,cy:cy,r:R,fill:'url(#stator-grad)',stroke:'#8088a0','stroke-width':2}));
 
-  // Stator slots (36 slots for 3-phase)
-  const slots=36;
+  // Stator slots mengikuti jumlah kutub: 6 slot per kutub.
+  const poleCount=S.poleCount||2;
+  const pairs=polePairs(poleCount);
+  const slots=slotCount(S.poleCount);
   for(let i=0;i<slots;i++){
     const ang=i*2*Math.PI/slots;
     const x1=cx+(R*0.72)*Math.cos(ang);
@@ -1532,26 +1541,23 @@ function initSvgRealistic(svg,w,h){
   svg.appendChild(mkSvg('circle',{id:'airgap',cx:cx,cy:cy,r:R*RGEO.gap,fill:'none',stroke:'#c0c8d8','stroke-width':1,'stroke-dasharray':'4,4'}));
   svg.appendChild(mkSvg('circle',{id:'stator-bore',cx:cx,cy:cy,r:R*RGEO.condIn,fill:'none',stroke:'#ccd8e8','stroke-width':0.8,'stroke-dasharray':'2,2'}));
 
-  // ── Stator 3-phase windings: kumparan tersambung (bukan titik) ─────────
-  // Kirtley §4: tiga gulungan sama, terpisah 120° elektrik. Untuk 2-kutub
-  // (p=1), 120° elektrik = 120° mekanis. Masing-masing fasa 6 loop →
-  // jarak slot sekutu 60°.
+  // ── Stator 3-phase windings: jumlah kumparan mengikuti pole geometry ────
+  // Tiga fasa terpisah 120° elektrik; jarak mekanis mengikuti jumlah pasangan kutub.
   const phases=[
     {num:0,id:'A',color:'#c85000'},
     {num:1,id:'B',color:'#0068a8'},
     {num:2,id:'C',color:'#00a848'}
   ];
+  const coils=coilsPerPhase(S.poleCount);
   phases.forEach(ph=>{
-    for(let i=0;i<6;i++){
-      const slotAng=ph.num*2*Math.PI/3 + i*Math.PI/3;
-      // Satu kumparan: loop tersambung, tidak lagi 6 titik
+    for(let i=0;i<coils;i++){
+      const slotAng=ph.num*2*Math.PI/(3*pairs) + i*2*Math.PI/coils;
       svg.appendChild(mkSvg('path',{
         id:`winding-${ph.id}-${i}`,
-        d:buildCoilPath(cx,cy,R,slotAng,RGEO.endR[ph.num%3]),
+        d:buildCoilPath(cx,cy,R,slotAng,RGEO.endR[ph.num%3],pairs),
         fill:'none',stroke:ph.color,'stroke-width':R*0.045,
         'stroke-linecap':'round','stroke-linejoin':'round'
       }));
-      // Penanda arah arus dot/cross (titik=arus keluar +z, silang=masuk −z)
       svg.appendChild(buildCurrentMarker(cx,cy,R,slotAng,`cd-${ph.id}-${i}`));
     }
   });
@@ -1572,23 +1578,27 @@ function initSvgRealistic(svg,w,h){
   }));
   gRotor.appendChild(gFlux);
 
-  // Sumbu-d searah kutub N (Kirtley §9: "the direct axis is aligned with the
-  // field winding, while the quadrature axis leads the direct by 90 degrees").
-  // Sumbu-q mendahului d 90° elektrik — pada kerangka lokal ini arah +y.
-  //
-  // PENTING — konvensi kerangka lokal: SELURUH isi grup dibangun sepanjang +x
-  // (sumbu-d lokal = 0°), supaya updateSvgPhasorRealistic cukup memakai
-  // rotate(rotorAng) tanpa offset. Garis fluks di buildFluxPath juga memakai
-  // konvensi yang sama (keluar dekat 0°, masuk dekat 180°), jadi keduanya
-  // konsisten: fluks keluar dari kutub N dan masuk ke kutub S.
+  // Sumbu-d/q tetap ikut badan rotor; teksnya di-counter-rotate saat update.
   gRotor.appendChild(mkSvg('line',{id:'axis-d',x1:cx,y1:cy,x2:cx+rotorR,y2:cy,stroke:'#d84000','stroke-width':Math.max(1,R*0.008),'stroke-dasharray':'4,3'}));
   gRotor.appendChild(mkSvg('line',{id:'axis-q',x1:cx,y1:cy,x2:cx,y2:cy+rotorR*0.85,stroke:'#3a6818','stroke-width':Math.max(1,R*0.008),'stroke-dasharray':'4,3'}));
   gRotor.appendChild(mkSvg('text',{id:'axis-d-label',x:cx+rotorR+R*0.05,y:cy,fill:'#d84000','font-size':R*0.11,'text-anchor':'middle','dominant-baseline':'central'},'d'));
   gRotor.appendChild(mkSvg('text',{id:'axis-q-label',x:cx,y:cy+rotorR*0.85+R*0.06,fill:'#3a6818','font-size':R*0.11,'text-anchor':'middle','dominant-baseline':'central'},'q'));
 
-  // Kutub N pada sumbu-d lokal (+x), S berseberangan 180°
-  gRotor.appendChild(mkSvg('text',{id:'pole-N',x:cx+rotorR*0.6,y:cy,fill:'#0068d8','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'N'));
-  gRotor.appendChild(mkSvg('text',{id:'pole-S',x:cx-rotorR*0.6,y:cy,fill:'#d84000','font-size':R*0.18,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central'},'S'));
+  // Magnet batangan radial: embedded untuk 2 kutub, salient untuk mesin multi-kutub.
+  const magnetStyle={protrude:S.poleCount>2};
+  const protrude=magnetStyle.protrude;
+  const magnetCount=S.poleCount||2;
+  for(let i=0;i<magnetCount;i++){
+    const a=2*Math.PI*i/magnetCount;
+    const north=i%2===0;
+    const rIn=rotorR*0.68, rOut=rotorR*(protrude?1.24:0.96);
+    const mx=cx+(rIn+rOut)/2*Math.cos(a), my=cy+(rIn+rOut)/2*Math.sin(a);
+    const mw=R*0.085, mh=Math.max(4,rOut-rIn);
+    const magnet=mkSvg('rect',{id:`magnet-${i}`,x:-mw/2,y:-mh/2,width:mw,height:mh,rx:R*0.025,fill:north?'#0068d8':'#d84000',stroke:'#182438','stroke-width':1,transform:`translate(${mx} ${my}) rotate(${a*180/Math.PI+90})`});
+    gRotor.appendChild(magnet);
+    const faceR=rOut+R*0.06, lx=cx+faceR*Math.cos(a), ly=cy+faceR*Math.sin(a);
+    gRotor.appendChild(mkSvg('text',{id:`label-${i}`,x:lx,y:ly,fill:north?'#0068d8':'#d84000','font-size':R*0.11,'font-weight':'bold','text-anchor':'middle','dominant-baseline':'central','data-anchor':`${lx},${ly}`},north?'N':'S'));
+  }
   gRotor.appendChild(mkSvg('circle',{id:'shaft',cx:cx,cy:cy,r:R*0.08,fill:'#404858',stroke:'#303848','stroke-width':1.5}));
   svg.appendChild(gRotor);
 
@@ -1598,11 +1608,15 @@ function initSvgRealistic(svg,w,h){
   // Grup dibangun dengan sumbu acuan mengarah ke KANAN (+x). updateSvgPhasorRealistic
   // merotasinya dengan base = S.anim − π/2 sehingga RMF mengarah ke atas saat
   // S.anim = π/2 — konsisten dengan rotorAng = base + δ untuk kutub N.
-  const gRmf=mkSvg('g',{id:'g-rmf'});
+  const gRmf=mkSvg('g',{id:'g-rmf',pairs:polePairs(S.poleCount)});
   const rmfTip=R*RGEO.rmfOut;
   gRmf.appendChild(mkSvg('circle',{cx:cx,cy:cy,r:R*RGEO.rmfIn,fill:'rgba(48,160,96,0.18)',stroke:'rgba(48,160,96,0.55)','stroke-width':1.5,'stroke-dasharray':'3,3'}));
-  gRmf.appendChild(mkSvg('line',{x1:cx,y1:cy,x2:cx+rmfTip,y2:cy,stroke:'#30a060','stroke-width':Math.max(1,R*0.012)}));
-  gRmf.appendChild(mkSvg('circle',{cx:cx+rmfTip,cy:cy,r:R*0.022,fill:'#30a060'}));
+  for(let k=0;k<pairs;k++){
+    const a=k*2*Math.PI/pairs;
+    const x2=cx+rmfTip*Math.cos(a), y2=cy+rmfTip*Math.sin(a);
+    gRmf.appendChild(mkSvg('line',{x1:cx,y1:cy,x2:x2,y2:y2,stroke:'#30a060','stroke-width':Math.max(1,R*0.012)}));
+    gRmf.appendChild(mkSvg('circle',{cx:x2,cy:y2,r:R*0.022,fill:'#30a060'}));
+  }
   gRmf.appendChild(mkSvg('text',{x:cx+rmfTip*1.18,y:cy,fill:'#30a060','font-size':R*0.09,'text-anchor':'middle','dominant-baseline':'central'},'RMF'));
   svg.appendChild(gRmf);
 
@@ -1634,28 +1648,43 @@ function updateSvgPhasorRealistic(svg){
   const cx=w/2, cy=h/2, R=Math.min(h*0.38,w*0.28);
 
   // ── Posisi: base = RMF stator, rotorAng = sumbu-d rotor, selisihnya = δ ──
-  // (baris asli 1197–1198 — terverifikasi Kirtley §5, DIPERTAHANKAN)
+  // (terverifikasi Kirtley §5)
   const base=S.anim-Math.PI/2;
   const rotorAng=base+S.delta;
   const deg=a=>a*180/Math.PI;
+  // Id/Iq dari besaran terminal yang sama dengan jalur Q salient (Kundur §3.3).
+  // Memakai S.V nominal (bukan tegangan terminal sesaat): flux linkage tidak
+  // boleh ikut mengerut saat gangguan — asas constant flux linkage (Test 8).
+  const Xd=Math.max(S.Xs,0.01), Xq=Math.max(getMachineXq(S),0.01);
+  const Id=(S.V-S.Ef*Math.cos(S.delta))/Xd;
+  const Iq=(S.Ef*Math.sin(S.delta))/Xq;
+  const field=solveField(S.If||0,Id,Iq,S.poleCount||2,S.delta);
 
   // ── 1. Rotor + garis fluks + sumbu d/q: satu grup, dirotasi bersama ──
   const gRotor=safeQuerySelector(svg,'#g-rotor');
   if(gRotor) gRotor.setAttribute('transform',`rotate(${deg(rotorAng)} ${cx} ${cy})`);
+  // Teks tetap tegak, tetapi titik jangkar tetap ikut kutub rotor.
+  const uprightIds=['axis-d-label','axis-q-label'];
+  for(let i=0;i<(S.poleCount||2);i++) uprightIds.push(`label-${i}`);
+  uprightIds.forEach(id=>{
+    const label=safeQuerySelector(svg,`#${id}`);
+    if(!label) return;
+    const anchor=(label.getAttribute('data-anchor')||`${label.getAttribute('x')||cx},${label.getAttribute('y')||cy}`).split(',');
+    const x=+anchor[0]||cx, y=+anchor[1]||cy;
+    label.setAttribute('transform',`rotate(-${deg(rotorAng)} ${x} ${y})`);
+  });
 
-  // ── 2. Kerapatan garis fluks ∝ Ef (pemetaan tanh) ──
-  // Regenerasi path HANYA saat Ef berubah material atau ukuran berubah —
-  // bukan tiap frame. Rotasi rigid di atas sudah cukup untuk bergerak.
-  if(fluxCache.ef!==S.Ef||fluxCache.R!==R){
-    rebuildFluxPaths(svg,cx,cy,R,S.Ef);
+  // ── 2. Garis fluks dari solver, di-cache saat parameter medan berubah ──
+  // Fault hanya mengubah terminal voltage, bukan flux linkage.
+  if(fluxCache.If!==S.If||fluxCache.Id!==Id||fluxCache.Iq!==Iq||fluxCache.poleCount!==S.poleCount||fluxCache.R!==R){
+    rebuildFluxPaths(svg,cx,cy,R,field);
+    fluxCache.If=S.If; fluxCache.Id=Id; fluxCache.Iq=Iq;
+    fluxCache.poleCount=S.poleCount||2; fluxCache.R=R;
   }
   const gFlux=safeQuerySelector(svg,'#g-flux');
   if(gFlux){
-    const path=gFlux.firstChild;
-    if(path){
-      const fn=fluxNorm(S.Ef);
-      path.setAttribute('opacity',(0.35+0.55*fn).toFixed(3));
-    }
+    const fn=field.brRot;
+    Array.from(gFlux.children).forEach(path=>path.setAttribute('opacity',(0.35+0.55*Math.min(1,fn)).toFixed(3)));
   }
 
   // ── 3. RMF stator berputar pada kecepatan sinkron (base) ──

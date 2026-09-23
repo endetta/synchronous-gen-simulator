@@ -73,8 +73,20 @@ ok(!/id:`winding-\$\{[^}]+\}-\$\{i\}`,\s*\n\s*cx:/.test(initReal), 'tidak ada la
 const coil = fn('buildCoilPath');
 // kumparan = path dengan busur end-winding (perintah A) antara dua sisi slot
 ok(/A\$\{/.test(coil), 'buildCoilPath menghasilkan busur end-winding (arc 180°)');
-// dua sisi kumparan terpisah 180° mekanis (Kirtley §3: π/p untuk p=1)
-ok(coil.includes('th+Math.PI'), 'sisi kumparan berseberangan 180°');
+// dua sisi kumparan terpisah 180° elektrik = π/p mekanis
+ok(coil.includes('th+pitch'), 'sisi kumparan memakai pitch mekanis per pasangan kutub');
+
+sect('Test 3b: Geometri mengikuti jumlah kutub');
+ok(initReal.includes('slotCount(S.poleCount)'), 'slot count comes from pole geometry');
+ok(initReal.includes('coilsPerPhase(S.poleCount)'), 'coil count comes from pole geometry');
+ok(fn('buildCoilPath').includes('Math.PI / pairs'), 'coil pitch uses 180 electrical degrees');
+ok(initReal.includes('pairs:polePairs'), 'RMF group records the number of pole pairs');
+
+sect('Test 3c: Magnet batangan dan label rotor');
+ok(initReal.includes('id:`magnet-${i}`'), 'one bar magnet is created per pole');
+ok(initReal.includes('id:`label-${i}`'), 'one upright label is created per pole');
+ok(updReal.includes('rotate(-${deg(rotorAng)}'), 'labels receive counter-rotation');
+ok(initReal.includes('protrude:S.poleCount>2'), 'more than two poles use salient magnets');
 
 sect('Test 4: Penanda arah arus dot/cross (konvensi +z/−z)');
 ok(realSec.includes('buildCurrentMarker'), 'penanda dot/cross dibuat via buildCurrentMarker()');
@@ -93,10 +105,13 @@ const fluxSect = updReal.slice(updReal.indexOf('const gFlux='), updReal.indexOf(
 ok(fluxSect.length > 0 && !fluxSect.includes("setAttribute('d'"), 'path garis fluks tidak dihitung ulang per frame');
 ok(updReal.includes('deg(rotorAng)') && updReal.includes('deg(base)'), 'rotor pakai base+δ, RMF pakai base (kedua medan berputar bersama)');
 
-sect('Test 6: Regenerasi fluks jarang (fluxCache)');
-ok(updReal.includes('fluxCache.ef!==S.Ef'), 'regenerasi hanya saat Ef berubah');
-ok(updReal.includes('fluxCache.R!==R'), 'regenerasi juga saat ukuran berubah');
-ok(realSec.includes('tanh'), 'pemetaan kerapatan ∝ tanh(Ef) — anti-saturasi palsu (riset §3.8)');
+sect('Test 6: Regenerasi fluks jarang (fluxCache solver)');
+ok(updReal.includes('solveField('), 'flux rebuild reads solveField');
+ok(updReal.includes('fluxCache.If!==S.If'), 'field current invalidates flux cache');
+ok(updReal.includes('fluxCache.Id!==Id') && updReal.includes('fluxCache.Iq!==Iq'), 'armature components invalidate flux cache');
+ok(updReal.includes('fluxCache.poleCount!==S.poleCount'), 'pole count invalidates flux cache');
+ok(updReal.includes('fluxCache.R!==R'), 'SVG radius invalidates flux cache');
+ok(realSec.includes('solveField('), 'realistic path consumes the field solver');
 
 sect('Test 7: Determinisme — S.t, bukan Date.now()');
 const realFns = stripComments(
@@ -110,7 +125,7 @@ ok(realFns.includes('F0'), 'frekuensi listrik dari konstanta F0, bukan waktu din
 sect('Test 8: Fisika — fluks tetap saat SC, kerapatan ∝ Ef');
 ok(!updReal.includes('getVt'), 'kerapatan fluks tidak mengikuti tegangan terminal (constant flux linkage)');
 ok(!updReal.includes('sc_active'), 'tidak ada percabangan sc_active yang mengerutkan fluks');
-ok(updReal.includes('fluxNorm(S.Ef)'), 'opasitas fluks adalah fungsi Ef saja');
+ok(updReal.includes('field.brRot'), 'opasitas fluks mengikuti koefisien solver');
 
 sect('Test 9: RMF memakai sudut yang selama ini dead code');
 ok(updReal.includes('const base=S.anim-Math.PI/2'), 'base = S.anim − π/2 dipertahankan');
@@ -135,7 +150,7 @@ sect('Test 11: Konvensi kerangka lokal sumbu-d konsisten');
 // langsung benar tanpa offset. Kalau tidak, kutub N tidak akan segaris
 // dengan busur δ.
 const gRotorBlock = initReal.slice(initReal.indexOf("id:'g-rotor'"), initReal.indexOf("svg.appendChild(gRotor)"));
-ok(gRotorBlock.includes('x:cx+rotorR*0.6,y:cy'), 'kutub N di sumbu-d lokal (+x), bukan −y');
+ok(gRotorBlock.includes('Math.cos(a)'), 'magnet poles are distributed around the rotor');
 ok(gRotorBlock.includes('x1:cx,y1:cy,x2:cx+rotorR,y2:cy'), 'penanda sumbu-d sepanjang +x');
 ok(gRotorBlock.includes('x2:cx,y2:cy+rotorR*0.85'), 'sumbu-q tegak lurus d (arah +y)');
 // Fluks harus keluar dekat 0° dan masuk dekat 180° pada kerangka lokal yang sama
