@@ -667,9 +667,8 @@ function makeState(){
   const Xs = parseValidNumber(document.getElementById('sXs').value, 1.2, 0.05, 3, 'Reactance Xs');
   // Kontrol eksitasi bermakna ARUS MEDAN I_f (spec FEM medium); tegangan
   // internal E_af diturunkan lewat kurva OCC, jadi saturasi tidak bisa dilangkahi
-  // dari UI. Label kontrol masih "Ef" sampai plan visualisasi menggantinya.
-  // Nilai awal kontrak FEM: I_f = 1.0 pu → E_af = 1.0 pu. Kontrol lama
-  // tetap dibaca oleh UI sampai Task 5 menggantinya dengan kontrol I_f.
+  // dari UI. Kontrol I_f (#sIf, seksi MESIN) menggantikan slider Ef legacy.
+  // Nilai awal kontrak FEM: I_f = 1.0 pu → E_af = 1.0 pu.
   const If = 1.0;
   const Ef = getEaf(If);
   const Pm = parseValidNumber(document.getElementById('sPm').value, 0.8, 0.01, 3, 'Mechanical Power Pm');
