@@ -128,7 +128,6 @@ assertContains(html, 'Live System Status', 'Live System Status section');
 assertContains(html, 'Generator Parameters', 'Generator Parameters section');
 assertContains(html, 'Prime Mover', 'Prime Mover section');
 assertContains(html, 'MESIN', 'MESIN section');
-assertContains(html, 'Excitation (AVR)', 'Excitation section');
 assertContains(html, 'Short Circuit Event', 'Short Circuit Event section');
 assertContains(html, 'Real Load Response', 'RLR section');
 assertContains(html, 'Preset Scenarios', 'Preset Scenarios section');
@@ -146,8 +145,9 @@ assertContains(html, 'id="sIf"', 'Field current (I_f) slider');
 assertContains(html, 'id="visSpeed"', 'Visual speed selector');
 assertContains(html, 'id="nPm"', 'Pm parameter input');
 assertContains(html, 'id="sPm"', 'Pm parameter slider');
-assertContains(html, 'id="nEf"', 'Ef parameter input');
-assertContains(html, 'id="sEf"', 'Ef parameter slider');
+assertContains(html, 'id="nIf"', 'If parameter input');
+assertContains(html, 'id="sIf"', 'If parameter slider');
+assertContains(html, 'id="eaf-readout"', 'E_af derived readout');
 
 // Test 8: Buttons
 console.log('\nTest 8: Buttons');

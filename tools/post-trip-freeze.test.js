@@ -74,15 +74,14 @@ const assertTrue = (c, m) => {
   const elFor = (id) => (els[id] ||= mkEl());
   global.document.getElementById = (id) => elFor(id);
 
-  // Pasca-trip: onSl('Ef', {value:'2.500'}) harus DITOLAK — S.If/Eaf tidak berubah.
-  // Selama migrasi FEM, kontrol legacy Ef memetakan input ke arus medan If.
-  const fakeEl = (v) => ({ value: v, min: '0.1', max: '3', style: { setProperty() {} } });
+  // Pasca-trip: onSl('If', {value:'2.500'}) harus DITOLAK — S.If/Eaf tidak berubah.
+  const fakeEl = (v) => ({ value: v, min: '0.2', max: '3', style: { setProperty() {} } });
   const efBefore = s.Ef, ifBefore = s.If;
-  M.onSl('Ef', fakeEl('2.500'));
+  M.onSl('If', fakeEl('2.500'));
   assertTrue(s.Ef === efBefore && s.If === ifBefore, `onSl ditolak pasca-trip (If/Eaf tetap ${ifBefore}/${efBefore})`);
   // adjSl juga harus ditolak.
   const efBefore2 = s.Ef, ifBefore2 = s.If;
-  M.adjSl('Ef', 1);
+  M.adjSl('If', 1);
   assertTrue(s.Ef === efBefore2 && s.If === ifBefore2, `adjSl ditolak pasca-trip (If/Eaf tetap ${ifBefore2}/${efBefore2})`);
 
   // Reset melepas latch & unfreeze, lalu handler harus bekerja lagi
@@ -90,9 +89,9 @@ const assertTrue = (c, m) => {
   const s2 = M.getS_();
   assertTrue(!s2.oos_tripped, 'doReset melepas latch oos_tripped');
 
-  // Sebelum trip (state baru): kontrol legacy Ef memutakhirkan If dan E_af turunan.
+  // Sebelum trip (state baru): kontrol If memutakhirkan If dan E_af turunan.
   const efFresh = s2.Ef;
-  M.onSl('Ef', fakeEl('2.500'));
+  M.onSl('If', fakeEl('2.500'));
   assertTrue(s2.If === 2.5 && s2.Ef > efFresh, `onSl bekerja normal saat tidak trip (If ${s2.If}, E_af ${efFresh} → ${s2.Ef})`);
 
   console.log(`\n=== Summary ===\nPassed: ${passCount}  Failed: ${failCount}`);
