@@ -37,12 +37,14 @@ function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 }
 
-// Ambil isi fungsi (dari "function NAMA(" sampai "\n}" di kolom 0 berikutnya)
+// Ambil isi fungsi (dari "function NAMA(" sampai "\n}" atau "\r\n}" di kolom 0 berikutnya)
+// File HTML memakai CRLF — normalisasi dulu ke LF supaya indexOf stabil.
 function fn(name) {
-  const start = src.indexOf('function ' + name + '(');
+  const nsrc = src.replace(/\r\n/g, '\n');
+  const start = nsrc.indexOf('function ' + name + '(');
   if (start < 0) return '';
-  const end = src.indexOf('\n}', start);
-  return src.slice(start, end > 0 ? end + 2 : start + 5000);
+  const end = nsrc.indexOf('\n}', start);
+  return nsrc.slice(start, end > 0 ? end + 2 : start + 5000);
 }
 function between(a, b) {
   const i = src.indexOf(a);
@@ -113,14 +115,14 @@ ok(updReal.includes('fluxCache.poleCount!==S.poleCount'), 'pole count invalidate
 ok(updReal.includes('fluxCache.R!==R'), 'SVG radius invalidates flux cache');
 ok(realSec.includes('solveField('), 'realistic path consumes the field solver');
 
-sect('Test 7: Determinisme — S.t, bukan Date.now()');
+sect('Test 7: Determinisme — S.animT, bukan Date.now()');
 const realFns = stripComments(
   fn('initSvgRealistic') + fn('updateSvgPhasorRealistic') + fn('buildFluxPath') +
   fn('rebuildFluxPaths') + fn('buildCoilPath') + fn('buildCurrentMarker')
 );
 ok(!realFns.includes('Date.now()'), 'tidak ada Date.now() di fungsi mode realistis');
-ok(realFns.includes('wE*S.t'), 'arah arus memakai waktu simulasi S.t');
-ok(realFns.includes('F0'), 'frekuensi listrik dari konstanta F0, bukan waktu dinding');
+ok(realFns.includes('S.animT'), 'arah arus memakai jam visual S.animT');
+ok(realFns.includes('visSpeed') || realSec.includes('visSpeed'), 'kecepatan visual dari state visSpeed, bukan frekuensi fisika F0');
 
 sect('Test 8: Fisika — fluks tetap saat SC, kerapatan ∝ Ef');
 ok(!updReal.includes('getVt'), 'kerapatan fluks tidak mengikuti tegangan terminal (constant flux linkage)');
@@ -128,7 +130,7 @@ ok(!updReal.includes('sc_active'), 'tidak ada percabangan sc_active yang mengeru
 ok(updReal.includes('field.brRot'), 'opasitas fluks mengikuti koefisien solver');
 
 sect('Test 9: RMF memakai sudut yang selama ini dead code');
-ok(updReal.includes('const base=S.anim-Math.PI/2'), 'base = S.anim − π/2 dipertahankan');
+ok(updReal.includes('const base=S.animT-Math.PI/2'), 'base = S.animT − π/2 dipertahankan');
 ok(updReal.includes('rotorAng=base+S.delta'), 'rotorAng = base + δ dipertahankan');
 ok(updReal.includes("'#g-rmf'") && updReal.includes('deg(base)'), 'base kini DIPAKAI memutar #g-rmf (tidak lagi dead code)');
 ok(!stripComments(updReal).includes('syncAng'), 'variabel syncAng yang tidak terpakai sudah hilang');

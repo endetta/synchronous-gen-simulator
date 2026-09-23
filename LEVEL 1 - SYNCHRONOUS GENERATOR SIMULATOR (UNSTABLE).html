@@ -673,7 +673,18 @@ function makeState(){
     narr:'Sistem PLTU setimbang.', evts:[], ev_t0:0, _scnarr:false,
     _rlr_last_phase:'',
     animMode:'phasor', // 'phasor' | 'realistic'
+    animT:0,           // jam visual τ (radian) — dipakai jalur realistis (spec §6.2)
+    visSpeed:1,        // kecepatan visual (Hz) — dropdown 0.25/0.5/1/2
   };
+}
+
+// Jam visual τ — terpisah dari waktu fisika S.t dan dari fase phasor S.anim.
+// Deterministis: fungsi murni dari rdt; tidak pernah Date.now(). Di island,
+// laju ikut (1 + omega) sehingga percepatan frekuensi terlihat nyata.
+// (spec §6.2 — grid: ×1, island: ×(1+ω))
+function advanceVisualClock(s, rdt){
+  const island = s.mode === 'island' ? (1 + s.omega) : 1;
+  s.animT += 2 * Math.PI * s.visSpeed * rdt * island;
 }
 
 // ================================================================
@@ -889,6 +900,7 @@ function stepPhys(s,rdt){
   if(!s.oos_tripped){
     s.anim+=VSPD*rdt;
     if(s.anim>Math.PI*2)s.anim-=Math.PI*2;
+    advanceVisualClock(s, cap);
   }
   // OOS check — LATCHED. Begitu generator kehilangan sinkronisme, ia TRIP:
   // fisika berhenti (lihat break di stepPhys) dan banner bertahan sampai
@@ -1606,8 +1618,8 @@ function initSvgRealistic(svg,w,h){
   // ELEMEN BARU — ini yang selama ini hilang sehingga baris lama
   // `const syncAng = base` tidak dipakai. Sekarang base memutar #g-rmf.
   // Grup dibangun dengan sumbu acuan mengarah ke KANAN (+x). updateSvgPhasorRealistic
-  // merotasinya dengan base = S.anim − π/2 sehingga RMF mengarah ke atas saat
-  // S.anim = π/2 — konsisten dengan rotorAng = base + δ untuk kutub N.
+  // merotasinya dengan base = S.animT − π/2 sehingga RMF mengarah ke atas saat
+  // S.animT = π/2 — konsisten dengan rotorAng = base + δ untuk kutub N.
   const gRmf=mkSvg('g',{id:'g-rmf',pairs:polePairs(S.poleCount)});
   const rmfTip=R*RGEO.rmfOut;
   gRmf.appendChild(mkSvg('circle',{cx:cx,cy:cy,r:R*RGEO.rmfIn,fill:'rgba(48,160,96,0.18)',stroke:'rgba(48,160,96,0.55)','stroke-width':1.5,'stroke-dasharray':'3,3'}));
@@ -1648,8 +1660,8 @@ function updateSvgPhasorRealistic(svg){
   const cx=w/2, cy=h/2, R=Math.min(h*0.38,w*0.28);
 
   // ── Posisi: base = RMF stator, rotorAng = sumbu-d rotor, selisihnya = δ ──
-  // (terverifikasi Kirtley §5)
-  const base=S.anim-Math.PI/2;
+  // (terverifikasi Kirtley §5). Memakai jam visual τ (S.animT), bukan S.anim.
+  const base=S.animT-Math.PI/2;
   const rotorAng=base+S.delta;
   const deg=a=>a*180/Math.PI;
   // Id/Iq dari besaran terminal yang sama dengan jalur Q salient (Kundur §3.3).
@@ -1710,12 +1722,11 @@ function updateSvgPhasorRealistic(svg){
     }
   }
 
-  // ── 5. Arah arus di konduktor: dot/cross, fungsi waktu simulasi S.t ──
-  // BUKAN Date.now() — animasi bisa di-pause bersama simulasi dan
-  // deterministik untuk pengujian (riset §5.5).
-  const wE=2*Math.PI*F0; // ω elektrik, mesin 2-kutub
+  // ── 5. Arah arus di konduktor: dot/cross, fungsi jam visual τ (S.animT) ──
+  // BUKAN Date.now() — animasi bisa di-pause bersama simulasi dan deterministik
+  // untuk pengujian (riset §5.5). τ adalah fase visual: grid×visSpeed, island×(1+ω).
   for(let f=0;f<3;f++){
-    const iFasa=Math.sin(wE*S.t - f*2*Math.PI/3);
+    const iFasa=Math.sin(S.animT - f*2*Math.PI/3);
     const ph='ABC'[f];
     for(let i=0;i<6;i++){
       const dotEl=safeQuerySelector(svg,`#cd-${ph}-${i}-dot`);
@@ -1726,10 +1737,10 @@ function updateSvgPhasorRealistic(svg){
     }
   }
 
-  // ── 6. Denyut halus kumparan mengikuti |arus| fasa (fungsi S.t) ──
+  // ── 6. Denyut halus kumparan mengikuti |arus| fasa (fungsi τ) ──
   const phases=['A','B','C'];
   phases.forEach((ph,pi)=>{
-    const iFasa=Math.abs(Math.sin(wE*S.t - pi*2*Math.PI/3));
+    const iFasa=Math.abs(Math.sin(S.animT - pi*2*Math.PI/3));
     for(let i=0;i<6;i++){
       const coil=safeQuerySelector(svg,`#winding-${ph}-${i}`);
       if(coil) coil.setAttribute('opacity',(0.55+0.45*iFasa).toFixed(3));

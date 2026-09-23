@@ -81,7 +81,7 @@ async function makeExtractor(htmlPath) {
       'satCurve','getEaf','getFluxDensity',
       'polePairs','getXq','slotCount','coilsPerPhase','elecAngle',
       'getPeSal','solveDelta0','solveDeltaCr','solveDeltaCc','solveCCT',
-      'setIf','getPmaxSal','getPeState','getQeSal','solveField'];
+      'setIf','getPmaxSal','getPeState','getQeSal','solveField','advanceVisualClock'];
     const out = {};
     for (const n of names) out[n] = _get(n);
     out.EAC_TOL = (typeof EAC_TOL !== 'undefined') ? EAC_TOL : undefined;
@@ -114,7 +114,7 @@ async function makeExtractor(htmlPath) {
     'getRLRLoad', 'satCurve', 'getEaf', 'getFluxDensity',
     'polePairs', 'getXq', 'slotCount', 'coilsPerPhase', 'elecAngle',
     'getPeSal', 'solveDelta0', 'solveDeltaCr', 'solveDeltaCc', 'solveCCT',
-    'setIf', 'getPmaxSal', 'getPeState', 'getQeSal', 'solveField',
+    'setIf', 'getPmaxSal', 'getPeState', 'getQeSal', 'solveField', 'advanceVisualClock',
   ];
   const missing = REQUIRED.filter(k => typeof mod[k] !== 'function');
   if (missing.length > 0) {
