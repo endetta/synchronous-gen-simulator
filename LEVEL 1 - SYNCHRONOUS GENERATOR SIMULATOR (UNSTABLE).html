@@ -1804,11 +1804,11 @@ function updateSvgPhasorRealistic(svg){
     fluxCache.If=S.If; fluxCache.Id=Id; fluxCache.Iq=Iq;
     fluxCache.poleCount=S.poleCount||2; fluxCache.R=R;
   }
+  // Opacity TIDAK di-override per-frame: biarkan yang direbuild (Task 4)
+  // yang menentukan. Perubahan visual utama kini lewat density + width,
+  // bukan opacity (perbaikan keluhan "yang berubah opacity, bukan kerapatan").
   const gFlux=safeQuerySelector(svg,'#g-flux');
-  if(gFlux){
-    const fn=field.brRot;
-    Array.from(gFlux.children).forEach(path=>path.setAttribute('opacity',(0.35+0.55*Math.min(1,fn)).toFixed(3)));
-  }
+  if(gFlux&&fluxCache.If!==S.If){const br=field.brRot;(void)br;}
 
   // ── 3. RMF stator berputar pada kecepatan sinkron (base) ──
   const gRmf=safeQuerySelector(svg,'#g-rmf');

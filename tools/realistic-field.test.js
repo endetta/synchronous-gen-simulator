@@ -115,7 +115,7 @@ ok(updReal.includes("gRmf.setAttribute('transform'"), '#g-rmf dirotasi via trans
 // panjangnya berubah). Path garis fluks TIDAK boleh dihitung ulang per frame.
 const dWrites = (updReal.match(/setAttribute\('d'/g) || []).length;
 ok(dWrites === 1, `hanya busur δ yang menulis atribut d (ditemukan ${dWrites}, harus 1)`);
-const fluxSect = updReal.slice(updReal.indexOf('const gFlux='), updReal.indexOf('// ── 3.'));
+const fluxSect = updReal.slice(updReal.indexOf('const gFlux='), updReal.indexOf('// ── 4.'));
 ok(fluxSect.length > 0 && !fluxSect.includes("setAttribute('d'"), 'path garis fluks tidak dihitung ulang per frame');
 ok(updReal.includes('deg(rotorAng)') && updReal.includes('deg(base)'), 'rotor pakai base+δ, RMF pakai base (kedua medan berputar bersama)');
 
@@ -204,6 +204,15 @@ ok(rebFn.includes('density('), 'pakai density(If), bukan fluxCount');
 ok(rebFn.includes('buildArrowHead('), 'pakai buildArrowHead eksplisit');
 ok(rebFn.includes('stroke-dasharray'), 'leakage dashed');
 ok(!/d\+=buildFluxPath/.test(rebFn), 'tidak lagi merge multi-garis jadi satu path');
+
+sect('Test 16: opacity TIDAK di-override tiap frame di gFlux');
+const updNoOpOverride = stripComments(fn('updateSvgPhasorRealistic'));
+// Pastikan tidak ada lagi loop yang setAttribute('opacity') ke gFlux per frame.
+const gFluxBlock = updNoOpOverride.slice(
+  updNoOpOverride.indexOf("const gFlux="),
+  updNoOpOverride.indexOf("const gRmf=")
+);
+ok(!gFluxBlock.includes("setAttribute('opacity'"), 'gFlux tiap frame tidak set opacity');
 
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);
