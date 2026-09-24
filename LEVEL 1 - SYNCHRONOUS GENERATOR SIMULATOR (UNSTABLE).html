@@ -1538,6 +1538,7 @@ function rebuildFluxPaths(svg,cx,cy,R,field){
   const span=RGEO.fluxMax-RGEO.fluxMin;
   const pairs=Math.max(1,field.pairs||1);
   while(g.firstChild)g.removeChild(g.firstChild);
+  if (typeof buildFluxPath !== 'function') return; // INTERIM: dihapus Task 3, diganti Task 4
   for(let pair=0;pair<pairs;pair++){
     const pairAng=2*Math.PI*pair/pairs;
     let d='';
