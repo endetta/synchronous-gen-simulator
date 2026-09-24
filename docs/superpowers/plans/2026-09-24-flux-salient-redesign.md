@@ -44,7 +44,7 @@ These input classes are implied by the spec but hard to test inside the existing
 - Consumes: existing `solveField(If, Id, Iq, poleCount, delta)` signature, `ARM_COUPLE` constant
 - Produces: `solveField` returns extended object `{ brRot, armD, armQ, pairs, delta, pairs, gapProfile }` where `gapProfile` is a function `g(θ)` for the non-uniform air gap (1 at pole face, `gapMax/gapMax` at interpolar). Backward-compatible: old fields unchanged.
 
-- [ ] **Step 1: Add `gapProfile` and salient constants after `solveField`**
+- [x] **Step 1: Add `gapProfile` and salient constants after `solveField`**
 
 In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html` at :654-662, after the existing `solveField` function, add:
 
@@ -78,7 +78,7 @@ function makeGapProfile(pairs) {
 }
 ```
 
-- [ ] **Step 2: Extend `solveField` to return `gapProfile`**
+- [x] **Step 2: Extend `solveField` to return `gapProfile`**
 
 In the same file, inside `solveField`, add one line to the returned object:
 ```javascript
@@ -95,7 +95,7 @@ function solveField(If, Id, Iq, poleCount, delta){
 }
 ```
 
-- [ ] **Step 3: Add `fn('solveField')`-based assertion to `realistic-field.test.js`**
+- [x] **Step 3: Add `fn('solveField')`-based assertion to `realistic-field.test.js`**
 
 Add a new Test section at the END of `tools/realistic-field.test.js` (before the final summary), after Test 11:
 
@@ -108,7 +108,7 @@ const shoeMaskFn = fn('shoeMask');
 ok(/function\s+shoeMask/.test(shoeMaskFn), 'shoeMask terdefinisi');
 ```
 
-- [ ] **Step 4: Run test to verify new assertions pass**
+- [x] **Step 4: Run test to verify new assertions pass**
 
 ```bash
 node tools/realistic-field.test.js 2>&1 | tail -20
@@ -116,7 +116,7 @@ node tools/realistic-field.test.js 2>&1 | tail -20
 
 Expected: 63 + 3 = 66 assertions pass, 0 fail.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html" "tools/realistic-field.test.js"
@@ -141,7 +141,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: existing `getFluxDensity(If)` (OCC-derived, 0..1)
 - Produces: `density(If) -> int` in [6, 24], concave (saturation stated). Replaces both `fluxNorm` and `fluxCount`. Used by `rebuildFluxPaths` Task 4.
 
-- [ ] **Step 1: Delete `fluxNorm`/`fluxCount`, replace with `density(If)`**
+- [x] **Step 1: Delete `fluxNorm`/`fluxCount`, replace with `density(If)`**
 
 In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html` at :1440-1441, DELETE:
 ```javascript
@@ -159,7 +159,7 @@ function density(If){
 }
 ```
 
-- [ ] **Step 2: Update comment at :1437-1439**
+- [x] **Step 2: Update comment at :1437-1439**
 
 Replace the existing comment block (which references the now-dead `fluxNorm`/`fluxCount`):
 ```javascript
@@ -174,7 +174,7 @@ WITH:
 // melebih-lebihkan rentang Ef di atas knee (1.0 pu).
 ```
 
-- [ ] **Step 3: Add Test 13 for `density(If)` monotonicity**
+- [x] **Step 3: Add Test 13 for `density(If)` monotonicity**
 
 In `tools/realistic-field.test.js`, after the new Test 12 from Task 1, add:
 
@@ -187,7 +187,7 @@ ok(!/fluxNorm\s*\(/.test(stripComments(src)), 'fluxNorm sudah dihapus (dead code
 ok(!/fluxCount\s*\(/.test(stripComments(src)), 'fluxCount sudah dihapus (dead code)');
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 node tools/realistic-field.test.js 2>&1 | tail -25
@@ -195,7 +195,7 @@ node tools/realistic-field.test.js 2>&1 | tail -25
 
 Expected: 66 + 4 = 70 assertions pass. `npm test` still green (no other test references `fluxNorm`/`fluxCount`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html" "tools/realistic-field.test.js"
@@ -218,7 +218,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: existing `RGEO` constants, `pairs`, `gapProfile` from Task 1
 - Produces: `traceFieldLine(a0, r0, r1, field, opts) -> { points: [[x,y],...], midPoint: [x,y], midAngle: rad }`. One `<path>` worth of line data per call. Returns `null` on degenerate input. Pure function (no DOM). Used by Task 4.
 
-- [ ] **Step 1: Delete `buildFluxPath` and insert `traceFieldLine` + `buildArrowHead`**
+- [x] **Step 1: Delete `buildFluxPath` and insert `traceFieldLine` + `buildArrowHead`**
 
 In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html`, REPLACE :1451-1466 (`buildFluxPath` entire function) with:
 
@@ -280,7 +280,7 @@ function buildArrowHead(midPoint, midAngle, size){
 }
 ```
 
-- [ ] **Step 2: Add Test 14 for trace existence and signature**
+- [x] **Step 2: Add Test 14 for trace existence and signature**
 
 In `tools/realistic-field.test.js`, add:
 
@@ -296,7 +296,7 @@ ok(/Math\.max\(0\.7/.test(traceFn) || /Math\.max\(0\.7/.test(stripComments(src))
 ok(/Math\.min\(1\.3/.test(traceFn) || /Math\.min\(1\.3/.test(stripComments(src)), 'cap armD 1.3 (upper)');
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 node tools/realistic-field.test.js 2>&1 | tail -25
@@ -304,7 +304,7 @@ node tools/realistic-field.test.js 2>&1 | tail -25
 
 Expected: 70 + 6 = 76 assertions pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html" "tools/realistic-field.test.js"
@@ -328,7 +328,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: `density(If)` from Task 2, `traceFieldLine` from Task 3, `pathFromPoints`, `buildArrowHead`, `RGEO`, `SAL_*` constants
 - Produces: `#g-flux` populated with one `<path class="flux-main">` per main line + arrowhead `<path class="flux-arrow">` + `<path class="flux-leak">` dashed for leakage. No merged multi-line path. Used by `updateSvgPhasorRealistic` (no change to caller required).
 
-- [ ] **Step 1: Rewrite `rebuildFluxPaths`**
+- [x] **Step 1: Rewrite `rebuildFluxPaths`**
 
 In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html`, REPLACE entire `rebuildFluxPaths` :1471-1496 with:
 
@@ -393,7 +393,7 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
 }
 ```
 
-- [ ] **Step 2: Adjust Test 5 (d-write count)**
+- [x] **Step 2: Adjust Test 5 (d-write count)**
 
 Test 5 asserts exactly 1 `setAttribute('d')`. New `rebuildFluxPaths` writes `d` only on rebuild, but `updateSvgPhasorRealistic` still writes only δ-arc `d` per frame. Since `rebuildFluxPaths` is NOT in the update loop (it's guarded by `fluxCache`), Test 5 stays valid. Verify by running:
 
@@ -403,7 +403,7 @@ node tools/realistic-field.test.js 2>&1 | grep "Test 5"
 
 Expected: Test 5 still ✓ (the `dWrites === 1` assertion holds).
 
-- [ ] **Step 3: Add Test 15 for flux classification**
+- [x] **Step 3: Add Test 15 for flux classification**
 
 In `tools/realistic-field.test.js`, add:
 
@@ -419,7 +419,7 @@ ok(rebFn.includes('stroke-dasharray'), 'leakage dashed');
 ok(!/d\+=buildFluxPath/.test(rebFn), 'tidak lagi merge multi-garis jadi satu path');
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 node tools/realistic-field.test.js 2>&1 | tail -30
@@ -428,7 +428,7 @@ npm test 2>&1 | tail -10
 
 Expected: `realistic-field.test.js` = 76 + 7 = 83 assertions pass. `npm test` still green (no other test touches flux path).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html" "tools/realistic-field.test.js"
@@ -451,7 +451,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: existing `gFlux` query
 - Produces: opacity per-frame removed (or kept very narrow `0.85+0.10*fn`); density visual dominates.
 
-- [ ] **Step 1: Remove opacity override block**
+- [x] **Step 1: Remove opacity override block**
 
 In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html`, REPLACE :1715-1719:
 ```javascript
@@ -473,7 +473,7 @@ WITH:
   }
 ```
 
-- [ ] **Step 2: Add Test 16 for absence of override**
+- [x] **Step 2: Add Test 16 for absence of override**
 
 In `tools/realistic-field.test.js`, add:
 
@@ -488,7 +488,7 @@ const gFluxBlock = updNoOpOverride.slice(
 ok(!gFluxBlock.includes("setAttribute('opacity'"), 'gFlux tiap frame tidak set opacity');
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 node tools/realistic-field.test.js 2>&1 | tail -30
@@ -496,7 +496,7 @@ node tools/realistic-field.test.js 2>&1 | tail -30
 
 Expected: 83 + 1 = 84 assertions pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html" "tools/realistic-field.test.js"
@@ -519,7 +519,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Consumes: existing legend items array
 - Produces: entries for pole shoe, non-uniform air gap, leakage flux, N→S arrow; warning updated.
 
-- [ ] **Step 1: Replace legend items and warning**
+- [x] **Step 1: Replace legend items and warning**
 
 In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html`, REPLACE the `items` array at :1772-1781 AND the warning text at :1788-1789 with:
 
@@ -547,7 +547,7 @@ In `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html`, REPLACE the `ite
     'Air-gap permeance model + rotor/stator field superposition — NOT a full FEM mesh.'));
 ```
 
-- [ ] **Step 2: Adjust Test 3d assertions**
+- [x] **Step 2: Adjust Test 3d assertions**
 
 Test 3d has assertions like `legendFn.includes('Magnet batangan rotor')`. The new legend renames that entry. In `tools/realistic-field.test.js`, REPLACE the Test 3d block at :93-103 with:
 
@@ -566,7 +566,7 @@ ok(legendFn.includes('permeance') || legendFn.includes('superposisi') || legendF
    'warning: air-gap permeance / superposition, bukan FEM');
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 node tools/realistic-field.test.js 2>&1 | tail -35
@@ -574,7 +574,7 @@ node tools/realistic-field.test.js 2>&1 | tail -35
 
 Expected: 84 + 2 (adjusted 3d + new counts) still pass; full count ~86 assertions pass, 0 fail.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add "LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html" "tools/realistic-field.test.js"
@@ -588,6 +588,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ---
 
 ## Task 7: Final verification — manual smoke test of realistic-field contract + full suite
+> Dilaksanakan oleh `2026-09-24-finish-flux-salient-integration.md` — fix seed double-pairAng sudah di `759aa6b`.
 
 **Files:**
 - None (verification-only task). Optionally add a small Node smoke script under `tools/` if helpful.
