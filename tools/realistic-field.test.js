@@ -168,7 +168,7 @@ ok(gRotorBlock.includes('Math.cos(a)'), 'magnet poles are distributed around the
 ok(gRotorBlock.includes('x1:cx,y1:cy,x2:cx+rotorR,y2:cy'), 'penanda sumbu-d sepanjang +x');
 ok(gRotorBlock.includes('x2:cx,y2:cy+rotorR*0.85'), 'sumbu-q tegak lurus d (arah +y)');
 // Fluks harus keluar dekat 0° dan masuk dekat 180° pada kerangka lokal yang sama
-ok(fn('buildFluxPath').includes('Math.PI/2'), 'garis fluks memuncak di sumbu-q (90°)');
+ok(fn('traceFieldLine').includes('Math.sin(pairs * th)'), 'trace flux membelok mengikuti pola kutub (sin(pairs·θ))');
 
 sect('Test 12: Geometri pole shoe — solveField mengembalikan gapProfile');
 const solFn = fn('solveField');
@@ -184,6 +184,16 @@ ok(/function\s+density/.test(densFn), 'density(If) terdefinisi');
 ok(densFn.includes('getFluxDensity'), 'density memakai getFluxDensity (OCC)');
 ok(!/fluxNorm\s*\(/.test(stripComments(src)), 'fluxNorm sudah dihapus (dead code)');
 ok(!/fluxCount\s*\(/.test(stripComments(src)), 'fluxCount sudah dihapus (dead code)');
+
+sect('Test 14: traceFieldLine terdefinisi, pure function');
+const traceFn = fn('traceFieldLine');
+ok(/function\s+traceFieldLine/.test(traceFn), 'traceFieldLine ada');
+ok(traceFn.includes('gapProfile'), 'pakai gapProfile');
+ok(traceFn.includes('armDModulation'), 'pakai armDModulation (cap 30%)');
+ok(/function\s+armDModulation/.test(stripComments(src)), 'armDModulation terdefinisi');
+ok(/function\s+buildArrowHead/.test(stripComments(src)), 'buildArrowHead terdefinisi');
+ok(/Math\.max\(0\.7/.test(traceFn) || /Math\.max\(0\.7/.test(stripComments(src)), 'cap armD 0.7 (lower)');
+ok(/Math\.min\(1\.3/.test(traceFn) || /Math\.min\(1\.3/.test(stripComments(src)), 'cap armD 1.3 (upper)');
 
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);

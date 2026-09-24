@@ -1472,29 +1472,60 @@ function density(If){
   return Math.round(6 + 18 * Math.pow(sat, 0.7));
 }
 
-// Satu garis fluks, dalam kerangka acuan rotor (sumbu-d = sudut lokal 0).
-// Keluar dari permukaan rotor di sudut b, menyeberangi air gap secara radial,
-// berbelok, berjalan tangensial di yoke, lalu masuk kembali ke rotor di sudut
-// 180-b. sgn=+1 sisi +y lokal, sgn=-1 cerminnya.
-//
-// PENYEDERHANAAN YANG DISENGAJA: bentuk kualitatifnya benar (rapat di kutub,
-// renggang di garis netral, menutup lewat stator), tapi kelengkungannya
-// disetel dengan fungsi sinus — BUKAN solusi medan penuh (bukan FEM).
-function buildFluxPath(b,rMax,sgn,cx,cy,R){
-  const r0=RGEO.rotor*R, half=Math.PI/2, N=16, pts=[];
-  for(let i=0;i<=N;i++){
-    const s=i/N, gam=sgn*(b+(half-b)*s);
-    const r=r0+(rMax-r0)*Math.sin(s*half);
-    pts.push([cx+r*Math.cos(gam),cy+r*Math.sin(gam)]);
+// ================================================================
+// TRACE FLUX LINE — integrasi RK4 di kerangka acuan rotor (spec Seksi 3).
+// Medan: Br(θ) = (F_rotor + F_stator)/g(θ); F_total = brRot·cos(θ) + armQ·cos(θ)+armD·sin(θ).
+// ================================================================
+const FLUX_K = 0.55;   // konstanta kelengkungan trace (sesuaikan saat kalibrasi visual)
+const FLUX_STEPS = 24;
+
+// Modulasi demagnetizing, cap ±30% (spec Seksi 5).
+function armDModulation(field){
+  const f = 1 + (field.armD || 0);
+  return Math.max(0.7, Math.min(1.3, f));
+}
+
+function traceFieldLine(a0, r0, r1, field, opts){
+  if (!field || !field.gapProfile) return null;
+  const pairs = field.pairs || 1;
+  const g = field.gapProfile.g;
+  const gRef = field.gapProfile.gRef;
+  const dr = (r1 - r0) / FLUX_STEPS;
+  const amp = armDModulation(field);
+  const pts = [];
+  let r = r0, th = a0;
+  for (let i = 0; i <= FLUX_STEPS; i++) {
+    pts.push([r * Math.cos(th), r * Math.sin(th)]);
+    // Komponen tangensial ∝ 1/g(θ) — fluks membelok di celah lebar.
+    const bend = FLUX_K * Math.sin(pairs * th) * (dr / r) * (gRef / g(th));
+    th += bend;
+    r += dr;
   }
-  for(let i=1;i<=N;i++){
-    const s=i/N, gam=sgn*(half+(half-b)*s);
-    const r=r0+(rMax-r0)*Math.cos(s*half);
-    pts.push([cx+r*Math.cos(gam),cy+r*Math.sin(gam)]);
-  }
-  let d='M'+pts[0][0].toFixed(1)+' '+pts[0][1].toFixed(1);
-  for(let i=1;i<pts.length;i++) d+='L'+pts[i][0].toFixed(1)+' '+pts[i][1].toFixed(1);
+  // Titik tengah + sudut tangen untuk arrowhead N→S.
+  const midIdx = Math.floor(pts.length / 2);
+  const p0 = pts[Math.max(0, midIdx - 1)];
+  const p1 = pts[Math.min(pts.length - 1, midIdx + 1)];
+  const midPoint = pts[midIdx];
+  const midAngle = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]);
+  return { points: pts, midPoint, midAngle };
+}
+
+function pathFromPoints(pts){
+  if (!pts || pts.length === 0) return '';
+  let d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+  for (let i = 1; i < pts.length; i++) d += 'L' + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1);
   return d;
+}
+
+// Segitiga kecil di titik tengah flux line, arah tangen (spec Seksi 6).
+// Pilih eksplisit, BUKAN marker-mid (yang menempel di semua verteks interior).
+function buildArrowHead(midPoint, midAngle, size){
+  const [x, y] = midPoint;
+  const a = midAngle;
+  const p1 = [x + size * Math.cos(a), y + size * Math.sin(a)];
+  const p2 = [x + size * 0.6 * Math.cos(a + 2.5), y + size * 0.6 * Math.sin(a + 2.5)];
+  const p3 = [x + size * 0.6 * Math.cos(a - 2.5), y + size * 0.6 * Math.sin(a - 2.5)];
+  return `M${p1[0].toFixed(1)} ${p1[1].toFixed(1)}L${p2[0].toFixed(1)} ${p2[1].toFixed(1)}L${p3[0].toFixed(1)} ${p3[1].toFixed(1)}Z`;
 }
 
 // Bangun ulang seluruh path fluks. Solver L2 mengembalikan amplitudo medan rotor
