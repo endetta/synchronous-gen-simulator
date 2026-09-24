@@ -685,7 +685,7 @@ function shoeMask(localTh, pairs) {
 }
 
 function makeGapProfile(pairs) {
-  const min = SAL_GAP_MIN, max = SAL_GAP_MAX;
+  const min = SAL_GAP_MIN, max = (pairs === 1 ? min : SAL_GAP_MAX);
   // g_ref dipakai normalisasi trace agar kelengkungan tak bergantung absolut.
   const gRef = min;
   return { g: (th) => (min + (max - min) * (1 - shoeMask(th, pairs))) / gRef, gRef, min, max, pairs };

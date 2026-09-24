@@ -176,6 +176,7 @@ ok(solFn.includes('gapProfile'), 'solveField menghasilkan gapProfile');
 ok(solFn.includes('makeGapProfile'), 'gapProfile dibangun lewat makeGapProfile');
 const shoeMaskFn = fn('shoeMask');
 ok(/function\s+shoeMask/.test(shoeMaskFn), 'shoeMask terdefinisi');
+ok(/pairs\s*===\s*1\s*\?\s*min\s*:\s*SAL_GAP_MAX/.test(stripComments(src)) || /pairs\s*===\s*1\s*\?\s*min/.test(stripComments(src)), '2-pole (round): gap uniform (gapMax = gapMin)');
 
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);
