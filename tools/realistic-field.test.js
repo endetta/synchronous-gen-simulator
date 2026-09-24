@@ -195,6 +195,16 @@ ok(/function\s+buildArrowHead/.test(stripComments(src)), 'buildArrowHead terdefi
 ok(/Math\.max\(0\.7/.test(traceFn) || /Math\.max\(0\.7/.test(stripComments(src)), 'cap armD 0.7 (lower)');
 ok(/Math\.min\(1\.3/.test(traceFn) || /Math\.min\(1\.3/.test(stripComments(src)), 'cap armD 1.3 (upper)');
 
+sect('Test 15: rebuildFluxPaths klasifikasi main + leakage');
+const rebFn = fn('rebuildFluxPaths');
+ok(rebFn.includes('flux-main'), 'path utama ber-class flux-main');
+ok(rebFn.includes('flux-leak'), 'path bocor ber-class flux-leak');
+ok(rebFn.includes('flux-arrow'), 'path arrowhead ber-class flux-arrow');
+ok(rebFn.includes('density('), 'pakai density(If), bukan fluxCount');
+ok(rebFn.includes('buildArrowHead('), 'pakai buildArrowHead eksplisit');
+ok(rebFn.includes('stroke-dasharray'), 'leakage dashed');
+ok(!/d\+=buildFluxPath/.test(rebFn), 'tidak lagi merge multi-garis jadi satu path');
+
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);
 process.exit(fail ? 1 : 0);
