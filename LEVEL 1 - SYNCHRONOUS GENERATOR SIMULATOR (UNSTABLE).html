@@ -1560,13 +1560,13 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
           'stroke-width': Math.max(1, R * (0.008 + 0.010 * field.brRot)),
           'stroke-linecap': 'round',
           opacity: (0.70 + 0.25 * Math.min(1, field.brRot)).toFixed(3),
-          transform: `rotate(${pairAng * 180 / Math.PI} ${cx} ${cy})`
+          transform: `translate(${cx} ${cy}) rotate(${pairAng * 180 / Math.PI})`
         }));
         // Arrowhead N→S di titik tengah.
         g.appendChild(mkSvg('path', {
           class: 'flux-arrow', d: buildArrowHead(line.midPoint, line.midAngle, arrowSize),
           fill: mainColor, opacity: 0.9,
-          transform: `rotate(${pairAng * 180 / Math.PI} ${cx} ${cy})`
+          transform: `translate(${cx} ${cy}) rotate(${pairAng * 180 / Math.PI})`
         }));
       }
     }
@@ -1580,7 +1580,7 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
         class: 'flux-leak', d: pathFromPoints(line.points),
         fill: 'none', stroke: leakColor, 'stroke-width': Math.max(1, R * 0.006),
         'stroke-linecap': 'round', 'stroke-dasharray': '2,3', opacity: 0.6,
-        transform: `rotate(${pairAng * 180 / Math.PI} ${cx} ${cy})`
+        transform: `translate(${cx} ${cy}) rotate(${pairAng * 180 / Math.PI})`
       }));
     }
   }
