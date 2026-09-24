@@ -1808,7 +1808,7 @@ function updateSvgPhasorRealistic(svg){
   // yang menentukan. Perubahan visual utama kini lewat density + width,
   // bukan opacity (perbaikan keluhan "yang berubah opacity, bukan kerapatan").
   const gFlux=safeQuerySelector(svg,'#g-flux');
-  if(gFlux&&fluxCache.If!==S.If){const br=field.brRot;(void)br;}
+  if(gFlux&&fluxCache.If!==S.If){void field.brRot;}
 
   // ── 3. RMF stator berputar pada kecepatan sinkron (base) ──
   const gRmf=safeQuerySelector(svg,'#g-rmf');
