@@ -92,15 +92,16 @@ ok(initReal.includes('protrude:S.poleCount>2'), 'more than two poles use salient
 
 sect('Test 3d: Legenda realistis penuh + warning');
 const legendFn = fn('drawRealisticLegend');
-ok(legendFn.includes('Magnet batangan rotor'), 'legenda: magnet batangan');
-ok(legendFn.includes('Sumbu-d rotor'), 'legenda: sumbu-d');
-ok(legendFn.includes('Sumbu-q rotor'), 'legenda: sumbu-q');
-ok(legendFn.includes('Air gap'), 'legenda: air gap');
+ok(legendFn.includes('Flux line'), 'legenda: flux line');
+ok(legendFn.includes('leakage'), 'legenda: leakage flux');
+ok(legendFn.includes('N→S'), 'legenda: N→S direction');
+ok(legendFn.includes('pole shoe') || legendFn.includes('Pole shoe'), 'legenda: pole shoe');
+ok(legendFn.includes('Quadrature axis') || legendFn.includes('axis q'), 'legenda: sumbu q');
+ok(legendFn.includes('Non-uniform air gap'), 'legenda: non-uniform air gap');
 ok(legendFn.includes('RMF stator'), 'legenda: RMF');
-ok(legendFn.includes('Garis fluks'), 'legenda: garis fluks');
-ok(legendFn.includes('Belitan stator'), 'legenda: belitan stator');
-ok(legendFn.includes('Penyederhanaan'), 'warning penyederhanaan ada');
-ok(legendFn.includes('mesh'), 'warning menyebut BUKAN mesh FEM penuh');
+ok(legendFn.includes('Busur') && legendFn.includes('power angle'), 'legenda: busur δ');
+ok(legendFn.includes('permeance') || legendFn.includes('superposisi') || legendFn.includes('NOT a full FEM'),
+   'warning: air-gap permeance / superposition, bukan FEM');
 
 sect('Test 4: Penanda arah arus dot/cross (konvensi +z/−z)');
 ok(realSec.includes('buildCurrentMarker'), 'penanda dot/cross dibuat via buildCurrentMarker()');
@@ -115,7 +116,7 @@ ok(updReal.includes("gRmf.setAttribute('transform'"), '#g-rmf dirotasi via trans
 // panjangnya berubah). Path garis fluks TIDAK boleh dihitung ulang per frame.
 const dWrites = (updReal.match(/setAttribute\('d'/g) || []).length;
 ok(dWrites === 1, `hanya busur δ yang menulis atribut d (ditemukan ${dWrites}, harus 1)`);
-const fluxSect = updReal.slice(updReal.indexOf('const gFlux='), updReal.indexOf('// ── 3.'));
+const fluxSect = updReal.slice(updReal.indexOf('const gFlux='), updReal.indexOf('// ── 4.'));
 ok(fluxSect.length > 0 && !fluxSect.includes("setAttribute('d'"), 'path garis fluks tidak dihitung ulang per frame');
 ok(updReal.includes('deg(rotorAng)') && updReal.includes('deg(base)'), 'rotor pakai base+δ, RMF pakai base (kedua medan berputar bersama)');
 
@@ -168,7 +169,52 @@ ok(gRotorBlock.includes('Math.cos(a)'), 'magnet poles are distributed around the
 ok(gRotorBlock.includes('x1:cx,y1:cy,x2:cx+rotorR,y2:cy'), 'penanda sumbu-d sepanjang +x');
 ok(gRotorBlock.includes('x2:cx,y2:cy+rotorR*0.85'), 'sumbu-q tegak lurus d (arah +y)');
 // Fluks harus keluar dekat 0° dan masuk dekat 180° pada kerangka lokal yang sama
-ok(fn('buildFluxPath').includes('Math.PI/2'), 'garis fluks memuncak di sumbu-q (90°)');
+ok(fn('traceFieldLine').includes('Math.sin(pairs * th)'), 'trace flux membelok mengikuti pola kutub (sin(pairs·θ))');
+
+sect('Test 12: Geometri pole shoe — solveField mengembalikan gapProfile');
+const solFn = fn('solveField');
+ok(solFn.includes('gapProfile'), 'solveField menghasilkan gapProfile');
+ok(solFn.includes('makeGapProfile'), 'gapProfile dibangun lewat makeGapProfile');
+const shoeMaskFn = fn('shoeMask');
+ok(/function\s+shoeMask/.test(shoeMaskFn), 'shoeMask terdefinisi');
+ok(/pairs\s*===\s*1\s*\?\s*min\s*:\s*SAL_GAP_MAX/.test(stripComments(src)) || /pairs\s*===\s*1\s*\?\s*min/.test(stripComments(src)), '2-pole (round): gap uniform (gapMax = gapMin)');
+
+sect('Test 13: density(I_f) monoton naik + batas');
+const densFn = fn('density');
+ok(/function\s+density/.test(densFn), 'density(If) terdefinisi');
+ok(densFn.includes('getFluxDensity'), 'density memakai getFluxDensity (OCC)');
+ok(!/fluxNorm\s*\(/.test(stripComments(src)), 'fluxNorm sudah dihapus (dead code)');
+ok(!/fluxCount\s*\(/.test(stripComments(src)), 'fluxCount sudah dihapus (dead code)');
+
+sect('Test 14: traceFieldLine terdefinisi, pure function');
+const traceFn = fn('traceFieldLine');
+ok(/function\s+traceFieldLine/.test(traceFn), 'traceFieldLine ada');
+ok(traceFn.includes('gapProfile'), 'pakai gapProfile');
+ok(traceFn.includes('armDModulation'), 'pakai armDModulation (cap 30%)');
+ok(/function\s+armDModulation/.test(stripComments(src)), 'armDModulation terdefinisi');
+ok(/function\s+buildArrowHead/.test(stripComments(src)), 'buildArrowHead terdefinisi');
+ok(/Math\.max\(0\.7/.test(traceFn) || /Math\.max\(0\.7/.test(stripComments(src)), 'cap armD 0.7 (lower)');
+ok(/Math\.min\(1\.3/.test(traceFn) || /Math\.min\(1\.3/.test(stripComments(src)), 'cap armD 1.3 (upper)');
+
+sect('Test 15: rebuildFluxPaths klasifikasi main + leakage');
+const rebFn = fn('rebuildFluxPaths');
+ok(rebFn.includes('flux-main'), 'path utama ber-class flux-main');
+ok(rebFn.includes('flux-leak'), 'path bocor ber-class flux-leak');
+ok(rebFn.includes('flux-arrow'), 'path arrowhead ber-class flux-arrow');
+ok(rebFn.includes('density('), 'pakai density(If), bukan fluxCount');
+ok(rebFn.includes('buildArrowHead('), 'pakai buildArrowHead eksplisit');
+ok(rebFn.includes('stroke-dasharray'), 'leakage dashed');
+ok(!/d\+=buildFluxPath/.test(rebFn), 'tidak lagi merge multi-garis jadi satu path');
+
+sect('Test 16: opacity TIDAK di-override tiap frame di gFlux');
+ok(!stripComments(src).includes('pairAng + sgn') && !stripComments(src).includes('pairAng + SAL_SHOE_ARC'), 'seed flux lokal — bukan pairAng dua kali (transform yang mengrotasi) (spec §7)');
+const updNoOpOverride = stripComments(fn('updateSvgPhasorRealistic'));
+// Pastikan tidak ada lagi loop yang setAttribute('opacity') ke gFlux per frame.
+const gFluxBlock = updNoOpOverride.slice(
+  updNoOpOverride.indexOf("const gFlux="),
+  updNoOpOverride.indexOf("const gRmf=")
+);
+ok(!gFluxBlock.includes("setAttribute('opacity'"), 'gFlux tiap frame tidak set opacity');
 
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);
