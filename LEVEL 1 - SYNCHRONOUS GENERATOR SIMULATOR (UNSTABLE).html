@@ -1550,7 +1550,7 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
       const t = (k + 0.5) / n;
       const b = Math.asin(t) * 0.95;   // condense toward 0 (pole face)
       for (const sgn of [1, -1]) {
-        const a0 = pairAng + sgn * b;
+        const a0 = sgn * b;
         const line = traceFieldLine(a0, rotorR, statorYokeR, field, {});
         if (!line) continue;
         const pathId = `flux-p${pair}-${k}-${sgn > 0 ? 'u' : 'l'}`;
@@ -1572,7 +1572,7 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
     }
     // Leakage: antar-kutub, di luar busur sepatu.
     for (let k = 0; k < Math.max(2, Math.round(n * 0.3)); k++) {
-      const aLeak = pairAng + SAL_SHOE_ARC * 1.1 + (k + 0.5) * 0.15;
+      const aLeak = SAL_SHOE_ARC * 1.1 + (k + 0.5) * 0.15;
       const rLeakEnd = rotorR * (1.05 + 0.05 * (k + 1)); // tak lintas gap
       const line = traceFieldLine(aLeak, rotorR, rLeakEnd, field, {});
       if (!line) continue;
