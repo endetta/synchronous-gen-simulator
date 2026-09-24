@@ -2299,15 +2299,16 @@ function initTimeCharts(){
   });
 
   // Base options dengan animation untuk smooth x-axis shift
-  // T10: chart 1-3 menyembunyikan sumbu X, chart freq menampilkannya — tick
-  // label terakhir freq ("30") menyita ~8px di tepi kanan plot dibanding chart
-  // yang sumbu-X-nya tersembunyi. padding.right menggeser kanan plot freq agar
-  // keempat plot area sama lebar. Konstanta, bukan runtime-computed (update
-  // runtime memicu rekursi via stabilizer skala). Kalibrasi ulang jika ukuran
-  // font/stepSize tick X freq berubah (guard: freq-chart-alignment.test.js).
+  // Chart 1-3 menyembunyikan sumbu X; chart freq menampilkannya, dan tick
+  // label terakhir ("30") menyita ruang di tepi kanan plot. Lebar Y keempat
+  // chart disamakan oleh applySharedYWidth (lihat pinSharedYWidthOnce) sehingga
+  // garis awal plot Panel III rata; tepi kanan diseimbangkan lewat
+  // layout padding + tick padding 0 di baseOptsWithX (guard:
+  // freq-chart-alignment.test.js).
   const baseOptsNoX={
     responsive:false,
     maintainAspectRatio:false,
+    layout:{padding:{top:0,right:8,bottom:0,left:0}},
     animation:{
       duration:150, // Smooth transition untuk scale changes
       easing:'easeOutQuart'
@@ -2336,8 +2337,13 @@ function initTimeCharts(){
   };
 
   // Bottom chart options WITH visible x-axis
-  // T10: padding-right 8px menyeimbangkan inset tick label tepi kanan ("30")
-  // yang hanya dimiliki chart ini, agar lebar plot area ≈ chart 1-3.
+  // T10: layout padding.right 8px DISERAGAMKAN ke keempat chart. Chart.js
+  // menyisakan ruang untuk tick tepi kanan sumbu-X ("30") hanya pada chart yang
+  // menampilkan sumbu-X; tanpa padding seragam, plot freq menyusut ~7px
+  // (areaR 987 vs 994). 8px adalah nilai minimum di mana keempat area plot
+  // right-nya tepat sama — dijaga freq-chart-alignment.test.js (lebar) dan
+  // y-axis-origin-alignment.test.js (garis awal plot). Lebar sumbu-Y adalah
+  // urusan terpisah: applySharedYWidth.
   const baseOptsWithX={
     responsive:false,
     maintainAspectRatio:false,
@@ -2359,9 +2365,9 @@ function initTimeCharts(){
         max:30,
         // T06: Improved grid visibility for X-axis
         grid:{display:true,color:'rgba(58,68,101,0.35)',lineWidth:0.7},
-        // T10: tick padding 0 — padding horizontal menyita lebar plot area,
-        // sehingga plot freq menjorok ke kiri ~9px vs 3 chart di atasnya.
-        // Lebar Y sudah disamakan applySharedYWidth; sisa selisih hanya dari sini.
+        // T10: tick padding 0 — padding horizontal menyita lebar plot area.
+        // Tick tepi kanan ditangani layout padding.right seragam di atas; sumbu-Y
+        // ditangani applySharedYWidth. Keduanya tidak boleh tumpang tindih.
         ticks:{color:'#3a4465',font:{size:12},stepSize:5,padding:0},
         border:{color:'#ccd2e0'},
         // T07: Increased font size for axis title
@@ -2409,6 +2415,15 @@ function initTimeCharts(){
 
   // Set initial canvas sizes
   resizeTimeCharts();
+
+  // Pin lebar Y-axis SEKALI di sini, setelah keempat chart terukur. Sebelumnya
+  // pin pertama baru terjadi di updateTimeCharts() yang dipanggil render loop —
+  // 3 frame RAF(~50ms) setelah chart pertama tampil, sehingga plot keempat chart
+  // sempat terlihat bergeser 10px (delta 52.9 / freq 46.3 saat load pertama).
+  // Di sini keempat chart sudah di-commit oleh resizeTimeCharts(), jadi hook
+  // afterFit sudah mengukur tiap scale dan sharedYWidth terisi tepat pada
+  // frame render pertama.
+  pinSharedYWidthOnce();
 }
 
 // Tinggi minimum satu chart (px) — satu sumber kebenaran, dipakai oleh
