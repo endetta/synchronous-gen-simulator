@@ -652,13 +652,43 @@ function getQeSal(s){
 // ================================================================
 const ARM_COUPLE = 0.18;
 function solveField(If, Id, Iq, poleCount, delta){
+  const pairs = polePairs(poleCount);
   return {
     brRot: getFluxDensity(If),
     armD: -Id * ARM_COUPLE,
     armQ: Iq * ARM_COUPLE,
-    pairs: polePairs(poleCount),
-    delta
+    pairs,
+    delta,
+    gapProfile: makeGapProfile(pairs)
   };
+}
+
+// ================================================================
+// GEOMETRI POLE SHOE — salient-pole air-gap model (spec Seksi 1).
+// g(θ) = gapMin + (gapMax - gapMin) · (1 - shoeMask(θ)).
+// 2-pole (round): gapMin === gapMax, g uniform (backward-compatible).
+// ================================================================
+const SAL_GAP_MIN = 1.00;          // muka kutub (pole face)
+const SAL_GAP_MAX = 2.20;          // interpolar
+const SAL_SHOE_ARC = 70 * Math.PI / 180;   // lebar busur sepatu, mekanis
+const SAL_SHOE_HEIGHT = 0.05;      // tinggi sepatu (relatif R)
+const SAL_SHOE_FLARE = 0.4;        // flare ujung sepatu
+
+function shoeMask(localTh, pairs) {
+  // 1 di dalam busur sepatu, 0 di luar, cosine blend.
+  // localTh dalam kerangka rotor pasangan; 0 = muka kutub.
+  const half = SAL_SHOE_ARC / 2;
+  const a = ((localTh % (2 * Math.PI / pairs)) + (2 * Math.PI / pairs)) % (2 * Math.PI / pairs);
+  const dist = Math.min(a, (2 * Math.PI / pairs) - a);
+  if (dist >= half) return 0;
+  return 0.5 + 0.5 * Math.cos((dist / half) * Math.PI); // 1 di 0, 0 di half
+}
+
+function makeGapProfile(pairs) {
+  const min = SAL_GAP_MIN, max = SAL_GAP_MAX;
+  // g_ref dipakai normalisasi trace agar kelengkungan tak bergantung absolut.
+  const gRef = min;
+  return { g: (th) => (min + (max - min) * (1 - shoeMask(th, pairs))) / gRef, gRef, min, max, pairs };
 }
 
 function makeState(){

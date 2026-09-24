@@ -170,6 +170,13 @@ ok(gRotorBlock.includes('x2:cx,y2:cy+rotorR*0.85'), 'sumbu-q tegak lurus d (arah
 // Fluks harus keluar dekat 0° dan masuk dekat 180° pada kerangka lokal yang sama
 ok(fn('buildFluxPath').includes('Math.PI/2'), 'garis fluks memuncak di sumbu-q (90°)');
 
+sect('Test 12: Geometri pole shoe — solveField mengembalikan gapProfile');
+const solFn = fn('solveField');
+ok(solFn.includes('gapProfile'), 'solveField menghasilkan gapProfile');
+ok(solFn.includes('makeGapProfile'), 'gapProfile dibangun lewat makeGapProfile');
+const shoeMaskFn = fn('shoeMask');
+ok(/function\s+shoeMask/.test(shoeMaskFn), 'shoeMask terdefinisi');
+
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);
 process.exit(fail ? 1 : 0);
