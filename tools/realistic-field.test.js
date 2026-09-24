@@ -90,19 +90,18 @@ ok(initReal.includes('id:`label-${i}`'), 'one upright label is created per pole'
 ok(updReal.includes('rotate(-${deg(rotorAng)}'), 'labels receive counter-rotation');
 ok(initReal.includes('protrude:S.poleCount>2'), 'more than two poles use salient magnets');
 
-sect('Test 3d: Legenda realistis penuh + warning');
+sect('Test 3d: Legenda realistis ringkas + warning');
 const legendFn = fn('drawRealisticLegend');
 ok(legendFn.includes('Flux line'), 'legenda: flux line');
 ok(legendFn.includes('leakage'), 'legenda: leakage flux');
-ok(legendFn.includes('N→S'), 'legenda: N→S direction');
-ok(legendFn.includes('pole shoe') || legendFn.includes('Pole shoe'), 'legenda: pole shoe');
-ok(legendFn.includes('Quadrature axis') || legendFn.includes('axis q'), 'legenda: sumbu q');
-ok(legendFn.includes('Non-uniform air gap'), 'legenda: non-uniform air gap');
+ok(legendFn.includes('N→S'), 'legenda: arah N→S');
+ok(legendFn.includes('Rotor poles'), 'legenda: kutub rotor N/S');
+ok(legendFn.includes('Stator winding'), 'legenda: belitan stator');
 ok(legendFn.includes('RMF stator'), 'legenda: RMF');
-ok(legendFn.includes('Busur') && legendFn.includes('power angle'), 'legenda: busur δ');
+ok(legendFn.includes('Axes d') && legendFn.includes('q'), 'legenda: sumbu d/q');
+ok(!legendFn.includes('Non-uniform air gap') && !legendFn.includes('Pole shoe'), 'item jarang dipakai tidak ada lagi di legenda');
 ok(legendFn.includes('permeance') || legendFn.includes('superposisi') || legendFn.includes('NOT a full FEM'),
    'warning: air-gap permeance / superposition, bukan FEM');
-
 sect('Test 4: Penanda arah arus dot/cross (konvensi +z/−z)');
 ok(realSec.includes('buildCurrentMarker'), 'penanda dot/cross dibuat via buildCurrentMarker()');
 ok(realSec.includes("'-dot'") && realSec.includes("'-x'"), 'sepasang penanda dot dan cross ada');

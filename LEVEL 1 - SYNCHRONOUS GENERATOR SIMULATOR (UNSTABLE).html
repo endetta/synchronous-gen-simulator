@@ -1492,20 +1492,39 @@ function traceFieldLine(a0, r0, r1, field, opts){
   const gRef = field.gapProfile.gRef;
   const dr = (r1 - r0) / FLUX_STEPS;
   const amp = armDModulation(field);
-  const pts = [];
+  const out = [], ths = [], back = [];
   let r = r0, th = a0;
   for (let i = 0; i <= FLUX_STEPS; i++) {
-    pts.push([r * Math.cos(th), r * Math.sin(th)]);
+    ths.push(th);
+    out.push([r * Math.cos(th), r * Math.sin(th)]);
     // Komponen tangensial ∝ 1/g(θ) — fluks membelok di celah lebar.
     const bend = FLUX_K * Math.sin(pairs * th) * (dr / r) * (gRef / g(th));
     th += bend;
     r += dr;
   }
-  // Titik tengah + sudut tangen untuk arrowhead N→S.
-  const midIdx = Math.floor(pts.length / 2);
-  const p0 = pts[Math.max(0, midIdx - 1)];
-  const p1 = pts[Math.min(pts.length - 1, midIdx + 1)];
-  const midPoint = pts[midIdx];
+  // Loop N→S TERTUTUP: garis tidak berhenti di yoke — berbelok di dalam besi
+  // stator (busur yoke), lalu masuk kembali ke kutub selatan. Sisi masuk adalah
+  // pantulan simetri terhadap sumbu-q: θ' = π/p − θ (fluks menutup, Kirtley §2).
+  const thEnd = Math.PI / pairs - th;
+  let dTh = thEnd - th;
+  while (dTh > Math.PI) dTh -= 2 * Math.PI;
+  while (dTh < -Math.PI) dTh += 2 * Math.PI;
+  const arcSteps = Math.max(2, Math.round(Math.abs(dTh) / 0.15));
+  for (let i = 1; i <= arcSteps; i++) {
+    const ta = th + dTh * i / arcSteps;
+    out.push([r1 * Math.cos(ta), r1 * Math.sin(ta)]);
+  }
+  for (let k = FLUX_STEPS - 1; k >= 0; k--) {
+    const ta = Math.PI / pairs - ths[k];
+    const rk = r0 + dr * k;
+    back.push([rk * Math.cos(ta), rk * Math.sin(ta)]);
+  }
+  const pts = out.concat(back);
+  // Titik tengah + sudut tangen untuk arrowhead N→S di kaki keluar (celah udara).
+  const midIdx = Math.floor(out.length / 2);
+  const p0 = out[Math.max(0, midIdx - 1)];
+  const p1 = out[Math.min(out.length - 1, midIdx + 1)];
+  const midPoint = out[midIdx];
   const midAngle = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]);
   return { points: pts, midPoint, midAngle };
 }
@@ -1861,23 +1880,23 @@ function updateSvgPhasorRealistic(svg){
 
 function drawRealisticLegend(svg,w,h){
   const legendX=10, legendY=h-180;
+  // Legenda ringkas: hanya elemen yang benar-benar dipakai pembaca —
+  // tiap baris memakai satu kelompok warna (swatch ganda untuk 2+ warna).
   const items = [
-    { label: 'Flux line (density ∝ B(I_f) — field solver)', color: '#2f6fb0' },
-    { label: 'Flux line leakage (antar-kutub/slot)', color: '#5a8fc0' },
-    { label: 'N→S direction arrowhead', color: '#2f6fb0' },
-    { label: 'Rotor pole shoe (N / S)', color: '#0068d8' },
-    { label: 'Rotor bar magnet (embedded, 2-pole round)', color: '#0068d8' },
-    { label: 'Stator winding phase A / B / C', color: '#c85000' },
+    { label: 'Flux line (density ∝ B(I_f)) — arrow N→S', color: '#2f6fb0' },
+    { label: 'Flux leakage (antar-kutub, dashed)', color: '#5a8fc0' },
+    { label: 'Rotor poles N / S', colors: ['#0068d8', '#d84000'] },
+    { label: 'Stator winding A / B / C', colors: ['#c85000', '#0068a8', '#00a848'] },
     { label: 'RMF stator (rotating 3-φ field)', color: '#30a060' },
-    { label: 'Direct axis d (sejajar field winding)', color: '#d84000' },
-    { label: 'Quadrature axis q (90° elektrik lead d)', color: '#3a6818' },
-    { label: 'Non-uniform air gap (g_min / g_max)', color: '#c0c8d8' },
-    { label: 'Busur δ — power angle (sama Panel II)', color: '#a86000' },
+    { label: 'Axes d / q (direct / quadrature)', colors: ['#d84000', '#3a6818'] },
   ];
   items.forEach((it, i) => {
     const y = legendY + i * 15;
-    svg.appendChild(mkSvg('rect', { x: legendX, y: y, width: 12, height: 12, fill: it.color, stroke: '#404858', 'stroke-width': 0.5, 'rx': 2 }));
-    svg.appendChild(mkSvg('text', { x: legendX + 18, y: y + 10, 'font-size': 10, fill: '#505868', 'font-family': 'var(--body)' }, it.label));
+    const cols = it.colors || [it.color];
+    cols.forEach((c, j) => {
+      svg.appendChild(mkSvg('rect', { x: legendX + j * 15, y: y, width: 12, height: 12, fill: c, stroke: '#404858', 'stroke-width': 0.5, 'rx': 2 }));
+    });
+    svg.appendChild(mkSvg('text', { x: legendX + 18 + (cols.length - 1) * 15, y: y + 10, 'font-size': 10, fill: '#505868', 'font-family': 'var(--body)' }, it.label));
   });
   const wy = legendY + items.length * 15 + 10;
   svg.appendChild(mkSvg('text', { x: legendX, y: wy, 'font-size': 9, fill: '#707888', 'font-family': 'var(--body)' },
