@@ -178,6 +178,13 @@ const shoeMaskFn = fn('shoeMask');
 ok(/function\s+shoeMask/.test(shoeMaskFn), 'shoeMask terdefinisi');
 ok(/pairs\s*===\s*1\s*\?\s*min\s*:\s*SAL_GAP_MAX/.test(stripComments(src)) || /pairs\s*===\s*1\s*\?\s*min/.test(stripComments(src)), '2-pole (round): gap uniform (gapMax = gapMin)');
 
+sect('Test 13: density(I_f) monoton naik + batas');
+const densFn = fn('density');
+ok(/function\s+density/.test(densFn), 'density(If) terdefinisi');
+ok(densFn.includes('getFluxDensity'), 'density memakai getFluxDensity (OCC)');
+ok(!/fluxNorm\s*\(/.test(stripComments(src)), 'fluxNorm sudah dihapus (dead code)');
+ok(!/fluxCount\s*\(/.test(stripComments(src)), 'fluxCount sudah dihapus (dead code)');
+
 console.log(`\n=== Realistic Field Contract ===`);
 console.log(`Passed: ${pass}  Failed: ${fail}`);
 process.exit(fail ? 1 : 0);

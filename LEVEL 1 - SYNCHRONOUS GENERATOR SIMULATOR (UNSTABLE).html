@@ -1464,11 +1464,13 @@ const RGEO={
 // Ref: docs/riset-medan-magnetik-dan-belitan.md §4.3 & §7.3
 const fluxCache={If:-1,Id:NaN,Iq:NaN,poleCount:0,R:0,n:0};
 
-// Eksitasi -> kerapatan garis, melengkung (tanh). Saturasi tidak dimodelkan
-// (riset §3.8), jadi pemetaan linear akan melebih-lebihkan rentang Ef:
-// tanpa lengkungan, Ef=3 tampak 30x lebih rapat daripada Ef=0.1.
-function fluxNorm(ef){ return Math.tanh(Math.max(0,ef)/1.5); }
-function fluxCount(ef){ return 6+Math.round(6*fluxNorm(ef)); }
+// Eksitasi -> kerapatan garis (density()), melengkung (OCC saturation).
+// Saturasi dimodelkan OCC (OCC_PEAK=1.55), jadi pemetaan linear akan
+// melebih-lebihkan rentang Ef di atas knee (1.0 pu).
+function density(If){
+  const sat = Math.max(0, Math.min(1, getFluxDensity(If)));   // OCC, 0..1
+  return Math.round(6 + 18 * Math.pow(sat, 0.7));
+}
 
 // Satu garis fluks, dalam kerangka acuan rotor (sumbu-d = sudut lokal 0).
 // Keluar dari permukaan rotor di sudut b, menyeberangi air gap secara radial,
