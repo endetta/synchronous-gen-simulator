@@ -12,8 +12,16 @@
  * kiri-kanan karena judul sumbu-Y berbeda.
  *
  * Status diuji (plan 002 Step 2): initial load, setelah reset, Grid/Island,
- * fault aktif, dan setelah drag-resize tinggi panel. Keyboard/puppet tidak
- * dipakai — panel resize disimulasikan lewat API yang sama dengan drag.
+ * fault aktif, dan setelah drag-resize tinggi panel. Kontrol yang tidak
+ * ditemukan = GAGAL (bukan skip senyap) — lima state wajib terukur semua.
+ *
+ * Done criteria #3 (tidak ada label terpotong) dijaga dua lapis:
+ * 1. Lebar Y terpakai >= kebutuhan tick well-formed terpanjang (STRICT fail).
+ * 2. Tick X freq ("30" dsb) muat di dalam canvas (STRICT fail).
+ * Label scientific-notation dust (mis. "5.51E-19" dari data Δω island yang
+ * float-dust, PRE-EXISTING di baseline 2dbd8d2 — di luar scope plan 002 yang
+ * mengecualikan perubahan physics) dicatat sebagai KNOWN DEFECT berteriak,
+ * bukan gagal dan bukan senyap: lihat ledger ruling.
  */
 const puppeteer = require('puppeteer');
 const path = require('path');
@@ -28,6 +36,9 @@ const ORIGIN_TOL_PX = 1;
 
 const KEYS = ['delta', 'omega', 'power', 'freq'];
 
+// Pola label tick scientific-notation (hasil format angka dust ~1e-19).
+const SCIENTIFIC_RE = /^-?[\d.]+E[-+]\d+$/i;
+
 const readOrigins = (page) => page.evaluate((keys) => {
   const out = {};
   for (const k of keys) {
@@ -36,14 +47,6 @@ const readOrigins = (page) => page.evaluate((keys) => {
   }
   return out;
 }, KEYS);
-
-// Klik kontrol UI lewat DOM agar efeknya sama dengan interaksi user.
-const clickById = (page, id) => page.evaluate((sel) => {
-  const el = document.getElementById(sel);
-  if (!el) throw new Error('Kontrol tidak ditemukan: ' + sel);
-  el.click();
-  return true;
-}, id);
 
 const settle = (page, ms = 350) => new Promise(r => setTimeout(r, ms));
 
@@ -54,9 +57,18 @@ function checkState(page, label, origins) {
   console.log(`\n  [${label}] plot origin (x): ${detail}  → spread ${spread.toFixed(2)}px`);
   assertTrue(
     spread <= ORIGIN_TOL_PX,
-    `[${label}] keempat plot origin Sejajar (spread ${spread.toFixed(2)}px ≤ ${ORIGIN_TOL_PX}px)`
+    `[${label}] keempat plot origin sejajar (spread ${spread.toFixed(2)}px ≤ ${ORIGIN_TOL_PX}px)`
   );
-  return spread;
+}
+
+// Jalankan aksi state; kontrol hilang = GAGAL, bukan skip.
+async function runState(page, label, expr, action) {
+  const ok = await page.evaluate(expr);
+  assertTrue(ok, `[${label}] kontrol aksi ditemukan dan dieksekusi`);
+  if (!ok) return false;
+  await settle(page, action);
+  checkState(page, label, await readOrigins(page));
+  return true;
 }
 
 (async () => {
@@ -80,79 +92,82 @@ function checkState(page, label, origins) {
   // ---- State 1: initial load -------------------------------------------------
   checkState(page, 'initial load', await readOrigins(page));
 
-  // ---- State 2: setelah reset ------------------------------------------------
-  const resetOk = await page.evaluate(() => {
-    if (typeof doReset === 'function') { doReset(); return 'doReset'; }
-    return null;
-  });
-  await settle(page);
-  if (resetOk) {
-    checkState(page, `setelah reset (${resetOk})`, await readOrigins(page));
-  } else {
-    console.log('\n  ! kontrol reset tidak ditemukan — state reset dilewati');
-  }
-
-  // ---- State 3: mode Island --------------------------------------------------
-  // Island mengubah f sehingga sumbu-Y freq/omega berubah rentang — lebar
-  // intrinsik tick ikut berubah, dan inilah yang harus diserap shared width.
-  const islanded = await page.evaluate(() => {
-    if (typeof runSc === 'function') { runSc('grid_island'); return true; }
-    return false;
-  });
-  if (islanded) {
-    await settle(page, 700);
-    checkState(page, 'mode Island (f/ω berubah rentang)', await readOrigins(page));
-  } else {
-    console.log('\n  ! kontrol Island tidak ditemukan — state island dilewati');
-  }
-
-  // ---- State 4: fault aktif --------------------------------------------------
-  const faulted = await page.evaluate(() => {
-    if (typeof runSc === 'function') { runSc('sc_fail'); return true; }
-    return false;
-  });
-  if (faulted) {
-    await settle(page, 900);
-    checkState(page, 'fault aktif (SC gagal clear)', await readOrigins(page));
-  } else {
-    console.log('\n  ! kontrol fault tidak ditemukan — state fault dilewati');
-  }
-
-  // ---- State 5: tinggi panel berubah (setelah drag-resize) -------------------
-  await page.evaluate(() => {
+  // ---- State 2-5 (control missing = FAIL, bukan skip) ------------------------
+  await runState(page, 'setelah reset (doReset)',
+    'typeof doReset === "function" ? (doReset(), true) : false', 350);
+  await runState(page, 'mode Island (f/ω berubah rentang)',
+    'typeof runSc === "function" ? (runSc("grid_island"), true) : false', 700);
+  await runState(page, 'fault aktif (SC gagal clear)',
+    'typeof runSc === "function" ? (runSc("sc_fail"), true) : false', 900);
+  await runState(page, 'tinggi pane3 +40px (drag-resize)', `(() => {
     const pane = document.getElementById('pane3');
-    if (!pane) return null;
+    if (!pane) return false;
     pane.style.height = (pane.getBoundingClientRect().height + 40) + 'px';
     if (typeof resizeTimeCharts === 'function') resizeTimeCharts();
     return true;
-  });
-  await settle(page);
-  checkState(page, 'tinggi pane3 +40px (drag-resize)', await readOrigins(page));
+  })()`, 350);
 
-  // ---- No clipping: judul & tick Y tidak boleh terpotong ---------------------
+  // ---- Clipping: lebar Y cukup + tick X muat di canvas -----------------------
   const clip = await page.evaluate((keys) => {
+    const SCIENTIFIC = /^-?[\d.]+E[-+]\d+$/i;
+    const measure = (ctx, fontCfg, text) => {
+      const prev = ctx.font;
+      const f = fontCfg || {};
+      ctx.font = (f.weight ? f.weight + ' ' : '') + (f.size || 12) + 'px ' +
+                 (f.family || "'Helvetica Neue', Helvetica, Arial, sans-serif");
+      const w = ctx.measureText(String(text)).width;
+      ctx.font = prev;
+      return w;
+    };
     const out = {};
     for (const k of keys) {
       const c = timeCharts[k];
       const area = c.chartArea;
       const y = c.scales.y;
+      const x = c.scales.x;
+      const yFont = ((y.options.ticks || {}).font) || {};
+      const xFont = ((x.options.ticks || {}).font) || {};
+
+      const yTicks = (y.ticks || []).map(t => String(t.label == null ? '' : t.label));
+      const wellFormed = yTicks.filter(l => !SCIENTIFIC.test(l));
+      const dust = yTicks.filter(l => SCIENTIFIC.test(l));
+      const neededW = Math.max(0, ...wellFormed.map(l => measure(c.ctx, yFont, l)))
+                    + ((y.options.ticks || {}).padding || 0) + 4;
+
+      // Tick X hanya dirender bila sumbu X display:true (chart freq).
+      const xVisible = !!(x.options && x.options.display);
+      const xClipped = [];
+      if (xVisible) {
+        for (const t of (x.ticks || [])) {
+          const lbl = String(t.label == null ? '' : t.label);
+          if (!lbl) continue;
+          const w = measure(c.ctx, xFont, lbl);
+          const px = x.getPixelForValue(t.value);
+          if (px - w / 2 < -0.5 || px + w / 2 > c.width + 0.5) {
+            xClipped.push({ lbl, px: Math.round(px * 10) / 10, w: Math.round(w * 10) / 10 });
+          }
+        }
+      }
+
       out[k] = {
-        // Plot asal tidak boleh tertutupi title/tick Y: sumbu Y harus >= 0.
         yLeft: y.left,
         yRight: y.right,
         areaLeft: area.left,
-        // Label Y terpanjang = tick + title digabung; ujungnya harus di dalam canvas
-        ticksInside: y.getLabels().every(lbl => {
-          const w = c.ctx.measureText(String(lbl)).width;
-          return y.left - w - 8 >= 0;
-        }),
-        titleText: (y.title && y.title.text) || '',
+        actualWidth: y.width,
+        neededWidth: neededW,
+        dustLabels: dust,
+        wellFormedMax: wellFormed.length
+          ? Math.round(Math.max(...wellFormed.map(l => measure(c.ctx, yFont, l))) * 10) / 10
+          : 0,
+        xClipped,
+        canvasW: c.width,
       };
     }
     return out;
   }, KEYS);
 
   console.log('\n  clipping check:');
+  let dustSeen = 0;
   for (const k of KEYS) {
     const c = clip[k];
     assertTrue(c.yLeft >= 0, `[${k}] sumbu Y tidak terpotong tepi kiri canvas (y.left=${c.yLeft.toFixed(1)})`);
@@ -160,6 +175,30 @@ function checkState(page, label, origins) {
       Math.abs(c.areaLeft - c.yRight) < 2,
       `[${k}] area plot mulai tepat di sumbu Y (area.left=${c.areaLeft.toFixed(1)}, y.right=${c.yRight.toFixed(1)})`
     );
+    // Done criteria #3 (lapis 1): tick well-formed muat di lebar sumbu Y.
+    assertTrue(
+      c.actualWidth >= c.neededWidth,
+      `[${k}] lebar Y (${c.actualWidth.toFixed(1)}px) ≥ tick terpanjang (${c.wellFormedMax}px + pad = ${c.neededWidth.toFixed(1)}px)`
+    );
+    // Done criteria #3 (lapis 2): tick X terlihat muat di dalam canvas.
+    assertTrue(
+      c.xClipped.length === 0,
+      `[${k}] tick X tidak keluar canvas (canvas ${c.canvasW}px)` +
+      (c.xClipped.length ? ` — terpotong: ${JSON.stringify(c.xClipped)}` : '')
+    );
+    // KNOWN DEFECT pre-existing: label scientific-notation dari data Δω dust
+    // (island mode). Teriak jelas — JANGAN senyap, JANGAN menggagalkan plan
+    // 002 yang scope-nya mengecualikan physics (ledger: Ruling).
+    if (c.dustLabels.length) {
+      dustSeen += c.dustLabels.length;
+      console.log(`  ⚠ [${k}] KNOWN DEFECT pre-existing (bukan regresi plan 002): ` +
+        `${c.dustLabels.length} label tick scientific-notation ` +
+        `mis. "${c.dustLabels[0]}" — data Δω float-dust saat range nyaris nol; ` +
+        `dipercik dari baseline 2dbd8d2; fix terpisah (physics/data).`);
+    }
+  }
+  if (dustSeen === 0) {
+    console.log('  ℹ tidak ada label scientific-notation (defect pre-existing tidak muncul di state ini)');
   }
 
   assertTrue(pageErrors.length === 0, `tidak ada page error (${pageErrors.length})`);
