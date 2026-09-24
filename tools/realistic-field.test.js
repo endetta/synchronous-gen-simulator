@@ -92,15 +92,16 @@ ok(initReal.includes('protrude:S.poleCount>2'), 'more than two poles use salient
 
 sect('Test 3d: Legenda realistis penuh + warning');
 const legendFn = fn('drawRealisticLegend');
-ok(legendFn.includes('Magnet batangan rotor'), 'legenda: magnet batangan');
-ok(legendFn.includes('Sumbu-d rotor'), 'legenda: sumbu-d');
-ok(legendFn.includes('Sumbu-q rotor'), 'legenda: sumbu-q');
-ok(legendFn.includes('Air gap'), 'legenda: air gap');
+ok(legendFn.includes('Flux line'), 'legenda: flux line');
+ok(legendFn.includes('leakage'), 'legenda: leakage flux');
+ok(legendFn.includes('N→S'), 'legenda: N→S direction');
+ok(legendFn.includes('pole shoe') || legendFn.includes('Pole shoe'), 'legenda: pole shoe');
+ok(legendFn.includes('Quadrature axis') || legendFn.includes('axis q'), 'legenda: sumbu q');
+ok(legendFn.includes('Non-uniform air gap'), 'legenda: non-uniform air gap');
 ok(legendFn.includes('RMF stator'), 'legenda: RMF');
-ok(legendFn.includes('Garis fluks'), 'legenda: garis fluks');
-ok(legendFn.includes('Belitan stator'), 'legenda: belitan stator');
-ok(legendFn.includes('Penyederhanaan'), 'warning penyederhanaan ada');
-ok(legendFn.includes('mesh'), 'warning menyebut BUKAN mesh FEM penuh');
+ok(legendFn.includes('Busur') && legendFn.includes('power angle'), 'legenda: busur δ');
+ok(legendFn.includes('permeance') || legendFn.includes('superposisi') || legendFn.includes('NOT a full FEM'),
+   'warning: air-gap permeance / superposition, bukan FEM');
 
 sect('Test 4: Penanda arah arus dot/cross (konvensi +z/−z)');
 ok(realSec.includes('buildCurrentMarker'), 'penanda dot/cross dibuat via buildCurrentMarker()');
