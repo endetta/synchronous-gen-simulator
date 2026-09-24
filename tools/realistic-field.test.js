@@ -207,6 +207,7 @@ ok(rebFn.includes('stroke-dasharray'), 'leakage dashed');
 ok(!/d\+=buildFluxPath/.test(rebFn), 'tidak lagi merge multi-garis jadi satu path');
 
 sect('Test 16: opacity TIDAK di-override tiap frame di gFlux');
+ok(!stripComments(src).includes('pairAng + sgn') && !stripComments(src).includes('pairAng + SAL_SHOE_ARC'), 'seed flux lokal — bukan pairAng dua kali (transform yang mengrotasi) (spec §7)');
 const updNoOpOverride = stripComments(fn('updateSvgPhasorRealistic'));
 // Pastikan tidak ada lagi loop yang setAttribute('opacity') ke gFlux per frame.
 const gFluxBlock = updNoOpOverride.slice(
