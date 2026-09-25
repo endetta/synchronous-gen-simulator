@@ -234,7 +234,7 @@ body.is-dragging .amode-btn,body.is-dragging .pane-resize button{pointer-events:
         <div class="drag-handle" data-pane="pane2"></div>
       </div>
       <!-- Panel 3: Canvas Time Series -->
-      <div class="vpane" id="pane3" style="height:300px">
+      <div class="vpane" id="pane3" style="height:318px">
         <div class="vlabel">III · Time Series</div>
         <canvas id="cv3"></canvas>
         <div class="pane-resize" data-pane-resize="pane3">
@@ -2257,9 +2257,12 @@ function initTimeCharts(){
   container.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;gap:2px;padding:24px 6px 6px;background:#f4f6fb;pointer-events:auto;';
 
   // Create chart wrappers - bottom chart will have x-axis
+  // Chart freq (i===3) menampilkan sumbu X dengan judul "Time (s)" — sumbu-X-nya
+  // butuh ruang vertikal lebih banyak (clamp maxHeight mengiris bila canvas
+  // terlalu pendek: cacat 2026-09-25 #2), jadi wrapper-nya diberi FREQ_MIN_WRAPPER_H.
   for(let i=0;i<4;i++){
     const wrapper=document.createElement('div');
-    wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:'+MIN_CHART_H+'px;overflow:hidden;';
+    wrapper.style.cssText='flex:1;position:relative;background:#fff;border:1px solid #ccd2e0;border-radius:3px;min-height:'+(i===3?FREQ_MIN_WRAPPER_H:MIN_CHART_H)+'px;overflow:hidden;';
     wrapper.innerHTML=`<canvas style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>`;
     container.appendChild(wrapper);
     // Legenda seri overlay (tidak memakan tinggi plot)
@@ -2334,6 +2337,9 @@ function initTimeCharts(){
   const baseOptsWithX={
     responsive:false,
     maintainAspectRatio:false,
+    // NOTA (cacat 2026-09-25 #2): JANGAN beri padding.bottom > 0 di sini untuk
+    // "ruang judul" — padding menyusutkan maxHeight sumbu-X (clamp active pior).
+    // Ruang judul diberi lewat FREQ_MIN_WRAPPER_H (wrapper chart freq).
     layout:{padding:{top:0,right:8,bottom:0,left:0}},
     animation:{
       duration:150,
@@ -2355,7 +2361,14 @@ function initTimeCharts(){
         // T10: tick padding 0 — padding horizontal menyita lebar plot area.
         // Tick tepi kanan ditangani layout padding.right seragam di atas; sumbu-Y
         // ditangani applySharedYWidth. Keduanya tidak boleh tumpang tindih.
-        ticks:{color:'#3a4465',font:{size:12},stepSize:5,padding:0},
+        // Cacat 2026-09-25 #1 (tepi kanan freq tidak lurus): ticks.align 'inner'
+        // — dengan 'center' (default), Chart.js menyisakan lebarLabelTerakhir/2
+        // di tepi kanan (_calculatePadding), sehingga chartArea.right freq
+        // bervariasi 982–979 mengikuti label terakhir jendela X sementara tiga
+        // chart atas (sumbu-X display:false) terkunci. 'inner' menambatkan label
+        // pertama/terakhir ke dalam plot (terukur: right tepat 986 di semua
+        // xMax 0.05…1000). Guard: freq-right-title.test.js.
+        ticks:{color:'#3a4465',font:{size:12},stepSize:5,padding:0,align:'inner'},
         border:{color:'#ccd2e0'},
         // T07: Increased font size for axis title
         title:{display:true,text:'Time (s)',color:'#3a4465',padding:4,font:{size:13}}
@@ -2418,8 +2431,14 @@ function initTimeCharts(){
 // melebihi kemampuan layoutnya (dulu: min-height 60px vs lantai drag 120px,
 // sehingga chart ke-4 terpotong).
 const MIN_CHART_H=60;
-// Lantai konten container chart = padding atas 24 + bawah 6 + 4 chart + 3 gap 2px
-const MIN_PANE_H=24+6+4*MIN_CHART_H+3*2; // 276px
+// Chart freq (ke-4) menampilkan judul "Time (s)" di sumbu-X — sumbu itu butuh
+// canvas >= 92px supaya clamp maxHeight=canvas/2 tidak mengiris kebutuhan fit
+// (tick 8 + label ~14.4 + judul ~23.6 ≈ 46px; cacat 2026-09-25 #2). Wrapper
+// freq diberi tinggi sendiri: min-height wrapper = canvas + 2px border.
+const FREQ_MIN_WRAPPER_H=96;
+// Lantai konten container chart = padding atas 24 + bawah 6 +
+// 3 chart biasa + chart freq + 3 gap 2px
+const MIN_PANE_H=24+6+3*MIN_CHART_H+FREQ_MIN_WRAPPER_H+3*2; // 318px
 
 // ================= KONTROL RESIZE PANE (tombol +/-/maks) =================
 // Masalah: pane III adalah pane TERAKHIR di #vizScroll; menarik handle di bawahnya
