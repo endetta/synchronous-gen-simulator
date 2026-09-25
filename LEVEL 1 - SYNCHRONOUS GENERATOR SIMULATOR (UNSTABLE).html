@@ -136,9 +136,6 @@ input[type=number]:focus{border-color:var(--etap)}
 .rlr-clk-val{font-family:var(--mono);font-size:15px;font-weight:700}
 .rlr-phase{background:var(--surf2);border:1px solid var(--brd);border-radius:3px;padding:8px 10px;margin:8px 0;font-family:var(--body);font-size:12px;color:var(--txt2);font-style:italic;line-height:1.5}
 .rlr-btns{display:flex;gap:7px}
-.leg{display:flex;flex-direction:column;gap:5px}
-.li{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--txt2);font-family:var(--body)}
-.ls{width:20px;height:3px;border-radius:2px;flex-shrink:0}
 .ref-item{font-family:var(--body);font-size:12px;color:var(--txt2);line-height:1.65;margin-bottom:8px;padding-left:14px;text-indent:-14px}
 .ref-item em{font-style:normal;font-weight:600;color:var(--etap)}
 .foot{padding:10px 14px;text-align:center}
@@ -357,16 +354,6 @@ body.is-dragging .amode-btn,body.is-dragging .pane-resize button{pointer-events:
     </div>
     <!-- Narrative -->
     <div class="csec"><div class="stitle">System Narrative</div><div class="narr"><div class="narr-hdr">Current State</div><div class="narr-body" id="narrtxt">Sistem PLTU setimbang.</div></div></div>
-    <!-- Legend -->
-    <div class="csec"><div class="stitle">Legend</div><div class="leg">
-      <div class="li"><div class="ls" style="background:var(--orange)"></div>P<sub>m</sub> — Mechanical Power</div>
-      <div class="li"><div class="ls" style="background:var(--cyan)"></div>P<sub>e</sub> — Electrical Power</div>
-      <div class="li"><div class="ls" style="background:var(--yellow)"></div>δ — Power Angle</div>
-      <div class="li"><div class="ls" style="background:var(--lime)"></div>Δω / Frequency Deviation</div>
-      <div class="li"><div class="ls" style="background:rgba(196,32,0,.4)"></div>A₁ — Acceleration Area (EAC)</div>
-      <div class="li"><div class="ls" style="background:rgba(10,112,64,.4)"></div>A₂ — Deceleration Area (EAC)</div>
-      <div class="li"><div class="ls" style="background:var(--blue)"></div>V<sub>t</sub> — Grid Reference Phasor</div>
-    </div></div>
     <!-- References -->
     <div class="csec"><div class="stitle">Academic References</div>
       <div class="ref-item"><em>[1]</em> Kundur, P. (1994). <em>Power System Stability and Control.</em> McGraw-Hill. — Swing equation §11.1, EAC §11.2–11.3.</div>

@@ -177,14 +177,15 @@ assertContains(html, 'id="oos-overlay"', 'OOS overlay element');
 assertContains(html, 'id="oos-warn"', 'OOS warning banner');
 assertContains(html, 'LOSS OF SYNCHRONISM', 'OOS warning text');
 
-// Test 12: Legend
-console.log('\nTest 12: Legend');
-assertContains(html, 'P<sub>m</sub> — Mechanical Power', 'Legend: Pm');
-assertContains(html, 'P<sub>e</sub> — Electrical Power', 'Legend: Pe');
-assertContains(html, 'δ — Power Angle', 'Legend: δ');
-assertContains(html, 'Δω / Frequency Deviation', 'Legend: Δω');
-assertContains(html, 'A₁ — Acceleration Area', 'Legend: A₁');
-assertContains(html, 'A₂ — Deceleration Area', 'Legend: A₂');
+// Test 12: Legend sidebar dihapus atas permintaan user (2026-09-25)
+console.log('\nTest 12: Legend sidebar dihapus');
+assert(!html.includes('P<sub>m</sub> — Mechanical Power'), 'Legend: Pm tidak ada');
+assert(!html.includes('P<sub>e</sub> — Electrical Power'), 'Legend: Pe tidak ada');
+assert(!html.includes('δ — Power Angle'), 'Legend: δ tidak ada');
+assert(!html.includes('Δω / Frequency Deviation'), 'Legend: Δω tidak ada');
+assert(!html.includes('Acceleration Area (EAC)'), 'Legend: A1 tidak ada');
+assert(!html.includes('Deceleration Area (EAC)'), 'Legend: A2 tidak ada');
+assert(!html.includes('<div class="stitle">Legend</div>'), 'Section Legend sidebar dihapus');
 
 // Test 13: References
 console.log('\nTest 13: Academic References');
