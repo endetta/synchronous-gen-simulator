@@ -92,7 +92,7 @@ git commit -m "fix(field): trace fluks Hermite v2 — loop dipolar teksbook, buk
 git push origin master
 ```
 
-**Commit hash:** (lihat `git log` sesudah push)
+**Commit hash:** `01ff764` (di-rebase di atas `9b3efbd` sesi chart Panel III, sudah push ke `origin/master`)
 
 ---
 
