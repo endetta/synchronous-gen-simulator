@@ -167,8 +167,12 @@ const gRotorBlock = initReal.slice(initReal.indexOf("id:'g-rotor'"), initReal.in
 ok(gRotorBlock.includes('Math.cos(a)'), 'magnet poles are distributed around the rotor');
 ok(gRotorBlock.includes('x1:cx,y1:cy,x2:cx+rotorR,y2:cy'), 'penanda sumbu-d sepanjang +x');
 ok(gRotorBlock.includes('x2:cx,y2:cy+rotorR*0.85'), 'sumbu-q tegak lurus d (arah +y)');
-// Fluks harus keluar dekat 0° dan masuk dekat 180° pada kerangka lokal yang sama
-ok(fn('traceFieldLine').includes('Math.sin(pairs * th)'), 'trace flux membelok mengikuti pola kutub (sin(pairs·θ))');
+// Fluks harus keluar dekat 0° dan masuk dekat 180° pada kerangka lokal yang sama.
+// Implementasi v2 (2026-09-25): gamba Hermite + splay fringing + cermin Φ=π/pairs,
+// menggantikan ODE sin(pairs·θ) yang deviasinya tak terkalibrasi (FLUX_K ~10°).
+const traceV2 = fn('traceFieldLine');
+ok(traceV2.includes('splay') && traceV2.includes('Math.PI / pairs'),
+  'trace: splay fringing + penutupan cermin Φ=π/pairs (gamba Hermite v2)');
 
 sect('Test 12: Geometri pole shoe — solveField mengembalikan gapProfile');
 const solFn = fn('solveField');
@@ -215,6 +219,59 @@ const gFluxBlock = updNoOpOverride.slice(
 );
 ok(!gFluxBlock.includes("setAttribute('opacity'"), 'gFlux tiap frame tidak set opacity');
 
-console.log(`\n=== Realistic Field Contract ===`);
-console.log(`Passed: ${pass}  Failed: ${fail}`);
-process.exit(fail ? 1 : 0);
+sect('Test 17: Seed di muka kutub — bukan starburst 85°');
+const reb17 = fn('rebuildFluxPaths');
+ok(!/Math\.asin\(t\)\s*\*\s*0\.95/.test(reb17),
+  'distribusi lama asin(t)*0.95 (±85°, menutupi seluruh lingkaran) dihapus');
+ok(reb17.includes('Math.sin(t * Math.PI / 2)'),
+  'seed baru padat di muka kutub: sin(t·π/2), bukan asin');
+ok(reb17.includes('halfPitch'),
+  'seed dibatasi separuh jarak kutub (halfPitch) agar tak melewati kutub tetangga');
+ok(reb17.includes('rYoke') || reb17.includes('fluxMax - 0.045'),
+  'radius yoke berbeda per garis (nesting), bukan satu cincin di 0.99R');
+ok(/\bamp\s*\*|\*\s*amp\b/.test(traceV2),
+  'modulasi armD (amp) benar-benar DIPAKAI di trace (bukan variabel mati, spec §5)');
+
+sect('Test 18: Bentuk trace — tiba tangensial di yoke, tetap di wedges kutub');
+// Dinamis via seam extract: menjalankan traceFieldLine sungguhan, bukan substring.
+(async () => {
+  const { makeExtractor } = require('./extract');
+  const mod = await makeExtractor(HTML);
+  const FLUX_STEPS = 24;   // kontrak: kaki keluar = FLUX_STEPS+1 titik pertama
+  for (const pairs of [1, 2, 3]) {
+    const gp = mod.makeGapProfile(pairs);
+    const field = { pairs, armD: 0.05, brRot: 0.6, gapProfile: gp };
+    const halfPitch = Math.PI / (2 * pairs);
+    for (const a0 of [0.05, 0.3, 0.6]) {
+      if (Math.abs(a0) >= halfPitch - 0.05) continue;
+      const L = mod.traceFieldLine(a0, 50, 96, field);
+      ok(!!L, `pairs=${pairs} a0=${a0}: trace menghasilkan path`);
+      if (!L) continue;
+      const leg = L.points.slice(0, FLUX_STEPS + 1);
+      // a) radius monoton naik di kaki keluar (tak ada lipatan balik)
+      let mono = true;
+      for (let i = 1; i < leg.length; i++) {
+        if (Math.hypot(leg[i][0], leg[i][1]) < Math.hypot(leg[i - 1][0], leg[i - 1][1]) - 1e-9) mono = false;
+      }
+      ok(mono, `pairs=${pairs} a0=${a0}: radius kaki keluar monoton naik`);
+      // b) tetap di wedges setengah jarak kutub (tidak menyeberang ke kutub tetangga)
+      let maxAng = 0;
+      for (const p of leg) maxAng = Math.max(maxAng, Math.abs(Math.atan2(p[1], p[0])));
+      ok(maxAng < halfPitch,
+        `pairs=${pairs} a0=${a0}: sudut maks ${maxAng.toFixed(2)} < halfPitch ${halfPitch.toFixed(2)}`);
+      // c) tiba HAMPIR tangensial di yoke (spec §3: sambungan C1 dgn busur yoke)
+      const pA = leg[leg.length - 2], pB = leg[leg.length - 1];
+      const segAng = Math.atan2(pB[1] - pA[1], pB[0] - pA[0]);
+      const ain = Math.atan2(pB[1], pB[0]);
+      let tbAng = Math.atan2(Math.cos(ain), -Math.sin(ain));   // tangensial θ̂ (a0 > 0)
+      let diff = Math.abs(segAng - tbAng) * 180 / Math.PI;
+      if (diff > 180) diff = 360 - diff;
+      ok(diff < 30,
+        `pairs=${pairs} a0=${a0}: tiba di yoke ${diff.toFixed(1)}° dari tangensial (< 30°)`);
+    }
+  }
+  console.log(`\n=== Realistic Field Contract ===`);
+  console.log(`Passed: ${pass}  Failed: ${fail}`);
+  process.exit(fail ? 1 : 0);
+})();
+

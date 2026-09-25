@@ -675,7 +675,11 @@ function makeGapProfile(pairs) {
   const min = SAL_GAP_MIN, max = (pairs === 1 ? min : SAL_GAP_MAX);
   // g_ref dipakai normalisasi trace agar kelengkungan tak bergantung absolut.
   const gRef = min;
-  return { g: (th) => (min + (max - min) * (1 - shoeMask(th, pairs))) / gRef, gRef, min, max, pairs };
+  // Wedges setengah jarak kutub + lebar seed (sumber tunggal untuk rebuild
+  // dan trace; mencegah seed/splay melewati batas kutub tetangga).
+  const halfPitch = Math.PI / (2 * pairs);
+  const spread = Math.min(SAL_SHOE_ARC / 2 + 0.22, halfPitch - 0.08);
+  return { g: (th) => (min + (max - min) * (1 - shoeMask(th, pairs))) / gRef, gRef, min, max, pairs, halfPitch, spread };
 }
 
 function makeState(){
@@ -1460,11 +1464,16 @@ function density(If){
 }
 
 // ================================================================
-// TRACE FLUX LINE — integrasi RK4 di kerangka acuan rotor (spec Seksi 3).
-// Medan: Br(θ) = (F_rotor + F_stator)/g(θ); F_total = brRot·cos(θ) + armQ·cos(θ)+armD·sin(θ).
+// TRACE FLUX LINE v2 (2026-09-25) — gamba Hermite, bukan RK4·sin(pairs·θ).
+// Kaki gap: A (muka kutub, keluar RADIAL) → B (yoke, tiba TANGENSIAL),
+// sambungan C1 mulus dengan busur yoke; loop N→S cermin Φ=π/pairs.
+// Splay mendorong garis ke luar (fringing, 0.08→0.30) dan dimodulasi armD
+// ±30% (spec Seksi 5): overexcited memperkuat, underexcited melemah.
+// Ref: docs/riset-medan-magnetik-dan-belitan.md §4.3.
 // ================================================================
-const FLUX_K = 0.55;   // konstanta kelengkungan trace (sesuaikan saat kalibrasi visual)
 const FLUX_STEPS = 24;
+const FLUX_SPLAY_BASE = 0.08;   // splay di sumbu-d (garis tengah lurus)
+const FLUX_SPLAY_EDGE = 0.30;   // splay total di tepi sepatu (fringing kuat)
 
 // Modulasi demagnetizing, cap ±30% (spec Seksi 5).
 function armDModulation(field){
@@ -1475,43 +1484,60 @@ function armDModulation(field){
 function traceFieldLine(a0, r0, r1, field, opts){
   if (!field || !field.gapProfile) return null;
   const pairs = field.pairs || 1;
-  const g = field.gapProfile.g;
-  const gRef = field.gapProfile.gRef;
-  const dr = (r1 - r0) / FLUX_STEPS;
+  const halfPitch = field.gapProfile.halfPitch || Math.PI / (2 * pairs);
+  const spread = field.gapProfile.spread || Math.min(SAL_SHOE_ARC / 2 + 0.22, halfPitch - 0.08);
+  const dir = a0 < 0 ? -1 : 1;
+  const ratio = Math.min(1, Math.abs(a0) / spread);
   const amp = armDModulation(field);
-  const out = [], ths = [], back = [];
-  let r = r0, th = a0;
+  // Splay makin besar ke tepi sepatu (fringing), dipotong agar tak melewati
+  // batas wedges setengah jarak kutub (4/6/8 poli). armD ikut modulasi.
+  const room = Math.max(0, halfPitch - 0.05 - Math.abs(a0));
+  const splay = Math.min(FLUX_SPLAY_BASE + (FLUX_SPLAY_EDGE - FLUX_SPLAY_BASE) * ratio * ratio,
+                         0.6 * room) * amp;
+  const ain = a0 + dir * splay;
+
+  // Kaki gap: Hermite kubik, A keluar radial (normal muka kutub) → B tiba
+  // tangensial di yoke, sehingga sambungan ke busur yoke C1-mulus (tanpa sudut 90°).
+  const A = [r0 * Math.cos(a0), r0 * Math.sin(a0)];
+  const B = [r1 * Math.cos(ain), r1 * Math.sin(ain)];
+  const TA = [Math.cos(a0), Math.sin(a0)];                    // radial keluar
+  const TB = [dir * -Math.sin(ain), dir * Math.cos(ain)];     // tangensial, arah splay
+  const c = 0.6 * Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const leg = [];
   for (let i = 0; i <= FLUX_STEPS; i++) {
-    ths.push(th);
-    out.push([r * Math.cos(th), r * Math.sin(th)]);
-    // Komponen tangensial ∝ 1/g(θ) — fluks membelok di celah lebar.
-    const bend = FLUX_K * Math.sin(pairs * th) * (dr / r) * (gRef / g(th));
-    th += bend;
-    r += dr;
+    const u = i / FLUX_STEPS;
+    const h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u;
+    const h01 = -2 * u * u * u + 3 * u * u,     h11 = u * u * u - u * u;
+    leg.push([
+      h00 * A[0] + h10 * c * TA[0] + h01 * B[0] + h11 * c * TB[0],
+      h00 * A[1] + h10 * c * TA[1] + h01 * B[1] + h11 * c * TB[1]
+    ]);
   }
-  // Loop N→S TERTUTUP: garis tidak berhenti di yoke — berbelok di dalam besi
-  // stator (busur yoke), lalu masuk kembali ke kutub selatan. Sisi masuk adalah
-  // pantulan simetri terhadap sumbu-q: θ' = π/p − θ (fluks menutup, Kirtley §2).
-  const thEnd = Math.PI / pairs - th;
-  let dTh = thEnd - th;
+  // Busur yoke: ain → Φ − ain (Φ = π/pairs), langkah halus 0.06 rad.
+  const Phi = Math.PI / pairs;
+  let dTh = (Phi - ain) - ain;
   while (dTh > Math.PI) dTh -= 2 * Math.PI;
   while (dTh < -Math.PI) dTh += 2 * Math.PI;
-  const arcSteps = Math.max(2, Math.round(Math.abs(dTh) / 0.15));
+  const arcSteps = Math.max(2, Math.round(Math.abs(dTh) / 0.06));
+  const arc = [];
   for (let i = 1; i <= arcSteps; i++) {
-    const ta = th + dTh * i / arcSteps;
-    out.push([r1 * Math.cos(ta), r1 * Math.sin(ta)]);
+    const ta = ain + dTh * i / arcSteps;
+    arc.push([r1 * Math.cos(ta), r1 * Math.sin(ta)]);
   }
+  // Loop N→S TERTUTUP: kaki balik = cermin reflektif θ' = Φ − θ — menembus
+  // celah menegak kembali ke kutub S (fluks menutup lewat rotor, Kirtley §2).
+  const cP = Math.cos(Phi), sP = Math.sin(Phi);
+  const back = [];
   for (let k = FLUX_STEPS - 1; k >= 0; k--) {
-    const ta = Math.PI / pairs - ths[k];
-    const rk = r0 + dr * k;
-    back.push([rk * Math.cos(ta), rk * Math.sin(ta)]);
+    const [x, y] = leg[k];
+    back.push([cP * x + sP * y, sP * x - cP * y]);
   }
-  const pts = out.concat(back);
+  const pts = leg.concat(arc, back);
   // Titik tengah + sudut tangen untuk arrowhead N→S di kaki keluar (celah udara).
-  const midIdx = Math.floor(out.length / 2);
-  const p0 = out[Math.max(0, midIdx - 1)];
-  const p1 = out[Math.min(out.length - 1, midIdx + 1)];
-  const midPoint = out[midIdx];
+  const midIdx = Math.floor(leg.length / 2);
+  const p0 = leg[Math.max(0, midIdx - 1)];
+  const p1 = leg[Math.min(leg.length - 1, midIdx + 1)];
+  const midPoint = leg[midIdx];
   const midAngle = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]);
   return { points: pts, midPoint, midAngle };
 }
@@ -1540,10 +1566,12 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
   const g = safeQuerySelector(svg, '#g-flux');
   if (!g) return;
   const n = density(field.brRot > 0 ? S.If || 0 : 0);   // pakai Task 2
-  const span = RGEO.fluxMax - RGEO.fluxMin;
   const pairs = Math.max(1, field.pairs || 1);
   const rotorR = R * RGEO.rotor * (1 + (pairs === 1 ? 0 : SAL_SHOE_HEIGHT * 0.5)); // shoeHeight=0 di 2-pole round (spec §1)
-  const statorYokeR = R * RGEO.fluxMax;
+  // Wedges setengah jarak kutub: seed tak boleh melewati batas kutub
+  // tetangga (4/6/8 poli). spread = muka sepatu + fringing, dipadatkan.
+  const halfPitch = (field.gapProfile && field.gapProfile.halfPitch) || Math.PI / (2 * pairs);
+  const spread = (field.gapProfile && field.gapProfile.spread) || Math.min(SAL_SHOE_ARC / 2 + 0.22, halfPitch - 0.08);
   const mainColor = '#2f6fb0', leakColor = '#5a8fc0';
   const arrowSize = R * 0.025;
   while (g.firstChild) g.removeChild(g.firstChild);
@@ -1552,12 +1580,18 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
   for (let pair = 0; pair < pairs; pair++) {
     const pairAng = 2 * Math.PI * pair / pairs;
     for (let k = 0; k < n; k++) {
-      // Distribusi cos^-like: rapat di muka kutub, renggang di netral.
+      // Padat di muka kutub, renggang ke tepi: sin(t·π/2) — BUKAN asin(t)·0.95
+      // yang justru mengeret ke tepi dan menutupi seluruh lingkaran (±85°).
       const t = (k + 0.5) / n;
-      const b = Math.asin(t) * 0.95;   // condense toward 0 (pole face)
+      const ratio = Math.sin(t * Math.PI / 2);
+      const b = spread * ratio;
       for (const sgn of [1, -1]) {
         const a0 = sgn * b;
-        const line = traceFieldLine(a0, rotorR, statorYokeR, field, {});
+        // Yoke bertingkat: garis tengah menempel tepi yoke luar (0.99R),
+        // garis tepi masuk lebih dalam (0.945R) — busur berlapis (nesting)
+        // alih-alih satu cincin datar di 0.99R.
+        const rYoke = R * (RGEO.fluxMax - 0.045 * ratio * ratio);
+        const line = traceFieldLine(a0, rotorR, rYoke, field, {});
         if (!line) continue;
         const pathId = `flux-p${pair}-${k}-${sgn > 0 ? 'u' : 'l'}`;
         g.appendChild(mkSvg('path', {
@@ -1576,9 +1610,11 @@ function rebuildFluxPaths(svg, cx, cy, R, field){
         }));
       }
     }
-    // Leakage: antar-kutub, di luar busur sepatu.
-    for (let k = 0; k < Math.max(2, Math.round(n * 0.3)); k++) {
-      const aLeak = SAL_SHOE_ARC * 1.1 + (k + 0.5) * 0.15;
+    // Leakage: busur pendek setengah-transparan di tepi sepatu (≤ spread),
+    // tak lintas gap. Rentangnya ikut spread agar tak melewati wedges kutub.
+    const leakN = Math.max(2, Math.round(n * 0.3));
+    for (let k = 0; k < leakN; k++) {
+      const aLeak = spread * (0.80 + 0.18 * (k + 0.5) / leakN);
       const rLeakEnd = rotorR * (1.05 + 0.05 * (k + 1)); // tak lintas gap
       const line = traceFieldLine(aLeak, rotorR, rLeakEnd, field, {});
       if (!line) continue;
